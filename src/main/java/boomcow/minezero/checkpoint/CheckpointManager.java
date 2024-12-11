@@ -66,6 +66,7 @@ public class CheckpointManager {
             }
         }
         data.setGroundItems(groundItemsList);
+        data.setFireTicks(player.getRemainingFireTicks());
 
 
     }
@@ -92,6 +93,7 @@ public class CheckpointManager {
 
             // Restore player XP
             player.setExperiencePoints(data.getCheckpointXP());
+            player.setRemainingFireTicks(data.getFireTicks());
 
             // Restore player inventory
             List<ItemStack> inv = data.getCheckpointInventory();

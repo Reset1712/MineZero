@@ -14,6 +14,17 @@ import java.util.List;
 public class CheckpointData extends SavedData {
     public static final String DATA_NAME = "minezero_checkpoint";
 
+    private int fireTicks;
+
+    public void setFireTicks(int fireTicks) {
+        this.fireTicks = fireTicks;
+        this.setDirty();
+    }
+
+    public int getFireTicks() {
+        return fireTicks;
+    }
+
     private BlockPos checkpointPos;
     private List<ItemStack> checkpointInventory = new ArrayList<>();
     private float checkpointHealth;
@@ -62,7 +73,7 @@ public class CheckpointData extends SavedData {
                 data.groundItems.add(groundItemsList.getCompound(i));
             }
         }
-
+        data.fireTicks = nbt.getInt("FireTicks");
         return data;
     }
 
@@ -101,7 +112,7 @@ public class CheckpointData extends SavedData {
             groundItemsList.add(itemNBT);
         }
         nbt.put("GroundItems", groundItemsList);
-
+        nbt.putInt("FireTicks", fireTicks);
         return nbt;
     }
 
