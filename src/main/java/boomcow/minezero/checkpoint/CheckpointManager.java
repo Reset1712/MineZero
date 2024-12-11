@@ -87,6 +87,12 @@ public class CheckpointManager {
             // Restore player health
             player.setHealth(data.getCheckpointHealth());
 
+            // Restore player hunger
+            player.getFoodData().setFoodLevel(data.getCheckpointHunger());
+
+            // Restore player XP
+            player.setExperiencePoints(data.getCheckpointXP());
+
             // Restore player inventory
             List<ItemStack> inv = data.getCheckpointInventory();
             if (inv != null) {
