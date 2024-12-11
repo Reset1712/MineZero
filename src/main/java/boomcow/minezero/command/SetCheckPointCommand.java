@@ -1,0 +1,31 @@
+package boomcow.minezero.command;
+
+import com.mojang.brigadier.CommandDispatcher;
+import boomcow.minezero.checkpoint.CheckpointManager;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+
+public class SetCheckPointCommand {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(
+                Commands.literal("setcheckpoint")
+                        .requires(cs -> cs.hasPermission(2)) // op-level 2 required
+                        .executes(context -> {
+                            CommandSourceStack source = context.getSource();
+                            ServerPlayer player;
+                            try {
+                                player = source.getPlayerOrException();
+                            } catch (Exception e) {
+                                source.sendFailure(Component.literal("This command can only be run by a player."));
+                                return 0;
+                            }
+
+                            CheckpointManager.setCheckpoint(player);
+                            source.sendSuccess(() -> Component.literal("Checkpoint set!"), true);
+                            return 1;
+                        })
+        );
+    }
+}

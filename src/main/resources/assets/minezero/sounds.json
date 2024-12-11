@@ -1,0 +1,7 @@
+{
+  "death_chime": {
+    "sounds": [
+      { "name": "minezero:death_chime" }
+    ]
+  }
+}
