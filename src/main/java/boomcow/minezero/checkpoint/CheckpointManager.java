@@ -67,7 +67,8 @@ public class CheckpointManager {
         }
         data.setGroundItems(groundItemsList);
         data.setFireTicks(player.getRemainingFireTicks());
-
+        // Set the anchor player
+        data.setAnchorPlayerUUID(player.getUUID());
 
     }
 

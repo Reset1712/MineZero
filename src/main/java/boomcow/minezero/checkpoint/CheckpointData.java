@@ -10,6 +10,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class CheckpointData extends SavedData {
     public static final String DATA_NAME = "minezero_checkpoint";
@@ -24,6 +25,18 @@ public class CheckpointData extends SavedData {
     public int getFireTicks() {
         return fireTicks;
     }
+
+    private UUID anchorPlayerUUID;
+
+    public void setAnchorPlayerUUID(UUID anchorPlayerUUID) {
+        this.anchorPlayerUUID = anchorPlayerUUID;
+        this.setDirty();
+    }
+
+    public UUID getAnchorPlayerUUID() {
+        return anchorPlayerUUID;
+    }
+
 
     private BlockPos checkpointPos;
     private List<ItemStack> checkpointInventory = new ArrayList<>();
@@ -74,6 +87,11 @@ public class CheckpointData extends SavedData {
             }
         }
         data.fireTicks = nbt.getInt("FireTicks");
+
+        if (nbt.hasUUID("AnchorPlayerUUID")) {
+            data.setAnchorPlayerUUID(nbt.getUUID("AnchorPlayerUUID"));
+        }
+
         return data;
     }
 
@@ -113,6 +131,11 @@ public class CheckpointData extends SavedData {
         }
         nbt.put("GroundItems", groundItemsList);
         nbt.putInt("FireTicks", fireTicks);
+
+        if (anchorPlayerUUID != null) {
+            nbt.putUUID("AnchorPlayerUUID", anchorPlayerUUID);
+        }
+
         return nbt;
     }
 

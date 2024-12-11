@@ -2,6 +2,8 @@ package boomcow.minezero.event;
 
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -9,46 +11,61 @@ import net.minecraft.sounds.SoundSource;
 import boomcow.minezero.ModSoundEvents;
 
 public class DeathEventHandler {
+
     @SubscribeEvent
     public void onPlayerDeath(LivingDeathEvent event) {
         try {
             if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-            //System.out.println("Starting player death handling for: " + player.getName().getString());
+            ServerLevel level = player.serverLevel();
+            CheckpointData data = CheckpointData.get(level);
 
-            CheckpointData data = CheckpointData.get(player.serverLevel());
-            if (data.getCheckpointPos() == null) {
-                //System.out.println("No checkpoint set, exiting...");
+            // Check if the player is the anchor player
+            if (player.getUUID().equals(data.getAnchorPlayerUUID())) {
+                // Reset the world
+                CheckpointManager.restoreCheckpoint(player);
+
+                // Notify all players
+                level.getServer().getPlayerList().getPlayers().forEach(p -> {
+                    p.displayClientMessage(Component.literal("The anchor player has died! Resetting the world."), true);
+                });
+
+                // Play sound to indicate reset
+                player.serverLevel().playSound(
+                        null,
+                        player.blockPosition(),
+                        ModSoundEvents.DEATH_CHIME.get(),
+                        SoundSource.PLAYERS,
+                        1.0F,
+                        1.0F
+                );
+
+                // Cancel the death
+                event.setCanceled(true);
                 return;
             }
 
-            //System.out.println("Restoring checkpoint at: " + data.getCheckpointPos());
+            // Handle non-anchor players' deaths
+            if (data.getCheckpointPos() != null) {
+                // Play sound for checkpoint restoration
+                player.serverLevel().playSound(
+                        null,
+                        player.blockPosition(),
+                        ModSoundEvents.DEATH_CHIME.get(),
+                        SoundSource.PLAYERS,
+                        1.0F,
+                        1.0F
+                );
 
-            // Play sound
-            player.serverLevel().playSound(
-                    null,
-                    player.blockPosition(),
-                    ModSoundEvents.DEATH_CHIME.get(),
-                    SoundSource.PLAYERS,
-                    1.0F,
-                    1.0F
-            );
-            //System.out.println("Played death chime sound.");
+                // Cancel death and restore checkpoint
+                event.setCanceled(true);
+                CheckpointManager.restoreCheckpoint(player);
 
-            // Cancel death
-            event.setCanceled(true);
-            //System.out.println("Death event canceled.");
-
-            // Restore checkpoint
-            CheckpointManager.restoreCheckpoint(player);
-            //System.out.println("Checkpoint restored.");
-
-            // Restore health
-            player.setHealth(Math.max(data.getCheckpointHealth(), 1.0F));
-            //System.out.println("Health restored to: " + player.getHealth());
+                // Restore health
+                player.setHealth(Math.max(data.getCheckpointHealth(), 1.0F));
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 }
