@@ -14,15 +14,15 @@ public class DeathEventHandler {
         try {
             if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-            System.out.println("Starting player death handling for: " + player.getName().getString());
+            //System.out.println("Starting player death handling for: " + player.getName().getString());
 
             CheckpointData data = CheckpointData.get(player.serverLevel());
             if (data.getCheckpointPos() == null) {
-                System.out.println("No checkpoint set, exiting...");
+                //System.out.println("No checkpoint set, exiting...");
                 return;
             }
 
-            System.out.println("Restoring checkpoint at: " + data.getCheckpointPos());
+            //System.out.println("Restoring checkpoint at: " + data.getCheckpointPos());
 
             // Play sound
             player.serverLevel().playSound(
@@ -33,19 +33,19 @@ public class DeathEventHandler {
                     1.0F,
                     1.0F
             );
-            System.out.println("Played death chime sound.");
+            //System.out.println("Played death chime sound.");
 
             // Cancel death
             event.setCanceled(true);
-            System.out.println("Death event canceled.");
+            //System.out.println("Death event canceled.");
 
             // Restore checkpoint
             CheckpointManager.restoreCheckpoint(player);
-            System.out.println("Checkpoint restored.");
+            //System.out.println("Checkpoint restored.");
 
             // Restore health
             player.setHealth(Math.max(data.getCheckpointHealth(), 1.0F));
-            System.out.println("Health restored to: " + player.getHealth());
+            //System.out.println("Health restored to: " + player.getHealth());
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -8,10 +8,12 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.StreamSupport;
 
 public class CheckpointManager {
 
@@ -53,6 +55,19 @@ public class CheckpointManager {
             }
         }
         data.setEntityData(entityList);
+
+        // Save items on the ground
+        List<CompoundTag> groundItemsList = new ArrayList<>();
+        for (Entity entity : level.getAllEntities()) {
+            if (entity instanceof ItemEntity itemEntity) {
+                CompoundTag itemNBT = new CompoundTag();
+                itemEntity.save(itemNBT);
+                groundItemsList.add(itemNBT);
+            }
+        }
+        data.setGroundItems(groundItemsList);
+
+
     }
 
     public static void restoreCheckpoint(ServerPlayer player) {
@@ -62,36 +77,65 @@ public class CheckpointManager {
 
             // Validate checkpoint data
             if (data.getCheckpointPos() == null) {
-                System.out.println("No checkpoint position found.");
-                return;
+                return; // No checkpoint position found, exit.
             }
 
-            // Teleport player
+            // Teleport player to checkpoint position
             BlockPos pos = data.getCheckpointPos();
             player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYRot(), player.getXRot());
-            System.out.println("Teleported player to checkpoint position.");
 
-            // Restore health
+            // Restore player health
             player.setHealth(data.getCheckpointHealth());
-            System.out.println("Restored player health to: " + player.getHealth());
 
-            // Restore inventory
+            // Restore player inventory
             List<ItemStack> inv = data.getCheckpointInventory();
             if (inv != null) {
-                System.out.println("Restoring inventory with size: " + inv.size());
                 player.getInventory().clearContent();
                 for (int i = 0; i < inv.size(); i++) {
                     player.getInventory().setItem(i, inv.get(i).copy());
                 }
             }
 
-            // Restore entities
+            // Remove all non-player entities
+            List<Entity> entitiesToRemove = new ArrayList<>();
+            for (Entity entity : level.getAllEntities()) {
+                if (!(entity instanceof ServerPlayer) && !entity.isRemoved()) {
+                    entitiesToRemove.add(entity);
+                }
+            }
+            for (Entity entity : entitiesToRemove) {
+                entity.discard(); // Safely remove the entity
+            }
+
+            // Restore mobs and players from checkpoint data
             List<CompoundTag> entities = data.getEntityData();
             if (entities != null) {
-                System.out.println("Restoring entities with size: " + entities.size());
                 for (CompoundTag eNBT : entities) {
-                    EntityType.loadEntityRecursive(eNBT, level, (entity) -> {
-                        level.addFreshEntity(entity);
+                    boolean alreadyExists = StreamSupport.stream(level.getAllEntities().spliterator(), false)
+                            .anyMatch(e -> e.getId() == eNBT.getInt("id")); // Replace with appropriate comparison
+
+                    if (!alreadyExists) {
+                        EntityType.loadEntityRecursive(eNBT, level, (entity) -> {
+                            if (entity != null) {
+                                level.addFreshEntity(entity); // Safely add entity
+                            }
+                            return entity;
+                        });
+                    }
+                }
+            }
+
+            // Restore items on the ground
+            List<CompoundTag> groundItemsList = data.getGroundItems();
+            if (groundItemsList != null) {
+                for (CompoundTag itemNBT : groundItemsList) {
+                    System.out.println("weener");
+                    EntityType.loadEntityRecursive(itemNBT, level, (entity) -> {
+                        System.out.println(entity);
+                        System.out.println(entity.getType());
+                        if (entity instanceof ItemEntity) {
+                            level.addFreshEntity(entity); // Safely add item entity
+                        }
                         return entity;
                     });
                 }
@@ -99,10 +143,11 @@ public class CheckpointManager {
 
             // Restore day time
             level.setDayTime(data.getCheckpointDayTime());
-            System.out.println("Restored day time to: " + data.getCheckpointDayTime());
+
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Log the exception for debugging
         }
     }
+
 
 }

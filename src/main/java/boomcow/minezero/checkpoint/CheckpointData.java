@@ -22,6 +22,7 @@ public class CheckpointData extends SavedData {
 
     private long checkpointDayTime;
     private List<CompoundTag> entityData = new ArrayList<>();
+    private List<CompoundTag> groundItems = new ArrayList<>();
 
     public CheckpointData() {}
 
@@ -51,6 +52,14 @@ public class CheckpointData extends SavedData {
             ListTag entityList = nbt.getList("Entities", Tag.TAG_COMPOUND);
             for (int i = 0; i < entityList.size(); i++) {
                 data.entityData.add(entityList.getCompound(i));
+            }
+        }
+
+        // Load ground items
+        if (nbt.contains("GroundItems", Tag.TAG_LIST)) {
+            ListTag groundItemsList = nbt.getList("GroundItems", Tag.TAG_COMPOUND);
+            for (int i = 0; i < groundItemsList.size(); i++) {
+                data.groundItems.add(groundItemsList.getCompound(i));
             }
         }
 
@@ -85,6 +94,13 @@ public class CheckpointData extends SavedData {
             entityList.add(eNBT);
         }
         nbt.put("Entities", entityList);
+
+        // Save ground items
+        ListTag groundItemsList = new ListTag();
+        for (CompoundTag itemNBT : groundItems) {
+            groundItemsList.add(itemNBT);
+        }
+        nbt.put("GroundItems", groundItemsList);
 
         return nbt;
     }
@@ -128,6 +144,11 @@ public class CheckpointData extends SavedData {
         this.setDirty();
     }
 
+    public void setGroundItems(List<CompoundTag> groundItems) {
+        this.groundItems = groundItems;
+        this.setDirty();
+    }
+
     public BlockPos getCheckpointPos() {
         return checkpointPos;
     }
@@ -154,5 +175,9 @@ public class CheckpointData extends SavedData {
 
     public List<CompoundTag> getEntityData() {
         return entityData;
+    }
+
+    public List<CompoundTag> getGroundItems() {
+        return groundItems;
     }
 }
