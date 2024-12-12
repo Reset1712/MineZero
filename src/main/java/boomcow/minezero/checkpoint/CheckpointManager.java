@@ -17,36 +17,46 @@ import java.util.stream.StreamSupport;
 
 public class CheckpointManager {
 
-    public static void setCheckpoint(ServerPlayer player) {
-        ServerLevel level = player.serverLevel();
+    public static void setCheckpoint(ServerPlayer anchorPlayer) {
+        ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
 
-        // Save player position
-        BlockPos pos = player.blockPosition();
-        data.setCheckpointPos(pos);
+        // Set the anchor player
+        data.setAnchorPlayerUUID(anchorPlayer.getUUID());
 
-        // Save player inventory
-        List<ItemStack> inv = new ArrayList<>();
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            inv.add(player.getInventory().getItem(i).copy());
+        // Capture all currently online players' data
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            PlayerData pdata = new PlayerData();
+            // Store player position
+            pdata.posX = player.getX();
+            pdata.posY = player.getY();
+            pdata.posZ = player.getZ();
+            pdata.yaw = player.getYRot();
+            pdata.pitch = player.getXRot();
+
+            // Store health, hunger, xp
+            pdata.health = player.getHealth();
+            pdata.hunger = player.getFoodData().getFoodLevel();
+            pdata.xp = player.experienceLevel; // or setExperiencePoints if needed
+            pdata.fireTicks = player.getRemainingFireTicks();
+
+            // Store inventory
+            pdata.inventory.clear();
+            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                ItemStack stack = player.getInventory().getItem(i).copy();
+                pdata.inventory.add(stack);
+            }
+
+            data.savePlayerData(player.getUUID(), pdata);
         }
-        data.setCheckpointInventory(inv);
-
-        // Save health, hunger, xp
-        data.setCheckpointHealth(player.getHealth());
-        data.setCheckpointHunger(player.getFoodData().getFoodLevel());
-        data.setCheckpointXP(player.experienceLevel);
 
         // Save day time
-        long dayTime = level.getDayTime();
-        data.setCheckpointDayTime(dayTime);
+        data.setCheckpointDayTime(level.getDayTime());
 
         // Save only mobs and players
         List<CompoundTag> entityList = new ArrayList<>();
         for (Entity e : level.getAllEntities()) {
-            //System.out.println(e.getName() + " " + e.getType().getCategory() + "");
             if (e instanceof Mob || e instanceof ServerPlayer) {
-
                 CompoundTag entityNBT = new CompoundTag();
                 e.save(entityNBT);
                 if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
@@ -66,42 +76,36 @@ public class CheckpointManager {
             }
         }
         data.setGroundItems(groundItemsList);
-        data.setFireTicks(player.getRemainingFireTicks());
-        // Set the anchor player
-        data.setAnchorPlayerUUID(player.getUUID());
-
     }
 
-    public static void restoreCheckpoint(ServerPlayer player) {
+    public static void restoreCheckpoint(ServerPlayer anchorPlayer) {
         try {
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
-
-            // Validate checkpoint data
             if (data.getCheckpointPos() == null) {
-                return; // No checkpoint position found, exit.
+                return;
             }
+            // Restore day time
+            level.setDayTime(data.getCheckpointDayTime());
 
-            // Teleport player to checkpoint position
-            BlockPos pos = data.getCheckpointPos();
-            player.teleportTo(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYRot(), player.getXRot());
+            // Restore all players from their saved data
+            for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+                PlayerData pdata = data.getPlayerData(player.getUUID());
+                if (pdata != null) {
+                    // Restore position
+                    player.teleportTo(level, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
 
-            // Restore player health
-            player.setHealth(data.getCheckpointHealth());
+                    // Restore health, hunger, xp, fire ticks
+                    player.setHealth(pdata.health);
+                    player.getFoodData().setFoodLevel(pdata.hunger);
+                    player.setExperiencePoints(pdata.xp);
+                    player.setRemainingFireTicks(pdata.fireTicks);
 
-            // Restore player hunger
-            player.getFoodData().setFoodLevel(data.getCheckpointHunger());
-
-            // Restore player XP
-            player.setExperiencePoints(data.getCheckpointXP());
-            player.setRemainingFireTicks(data.getFireTicks());
-
-            // Restore player inventory
-            List<ItemStack> inv = data.getCheckpointInventory();
-            if (inv != null) {
-                player.getInventory().clearContent();
-                for (int i = 0; i < inv.size(); i++) {
-                    player.getInventory().setItem(i, inv.get(i).copy());
+                    // Restore inventory
+                    player.getInventory().clearContent();
+                    for (int i = 0; i < pdata.inventory.size(); i++) {
+                        player.getInventory().setItem(i, pdata.inventory.get(i));
+                    }
                 }
             }
 
@@ -113,24 +117,19 @@ public class CheckpointManager {
                 }
             }
             for (Entity entity : entitiesToRemove) {
-                entity.discard(); // Safely remove the entity
+                entity.discard();
             }
 
             // Restore mobs and players from checkpoint data
             List<CompoundTag> entities = data.getEntityData();
             if (entities != null) {
                 for (CompoundTag eNBT : entities) {
-                    boolean alreadyExists = StreamSupport.stream(level.getAllEntities().spliterator(), false)
-                            .anyMatch(e -> e.getId() == eNBT.getInt("id")); // Replace with appropriate comparison
-
-                    if (!alreadyExists) {
-                        EntityType.loadEntityRecursive(eNBT, level, (entity) -> {
-                            if (entity != null) {
-                                level.addFreshEntity(entity); // Safely add entity
-                            }
-                            return entity;
-                        });
-                    }
+                    EntityType.loadEntityRecursive(eNBT, level, (entity) -> {
+                        if (entity != null) {
+                            level.addFreshEntity(entity);
+                        }
+                        return entity;
+                    });
                 }
             }
 
@@ -138,23 +137,18 @@ public class CheckpointManager {
             List<CompoundTag> groundItemsList = data.getGroundItems();
             if (groundItemsList != null) {
                 for (CompoundTag itemNBT : groundItemsList) {
-                    System.out.println("weener");
                     EntityType.loadEntityRecursive(itemNBT, level, (entity) -> {
-                        System.out.println(entity);
-                        System.out.println(entity.getType());
                         if (entity instanceof ItemEntity) {
-                            level.addFreshEntity(entity); // Safely add item entity
+                            level.addFreshEntity(entity);
                         }
                         return entity;
                     });
                 }
             }
 
-            // Restore day time
-            level.setDayTime(data.getCheckpointDayTime());
 
         } catch (Exception e) {
-            e.printStackTrace(); // Log the exception for debugging
+            e.printStackTrace();
         }
     }
 

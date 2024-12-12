@@ -21,49 +21,36 @@ public class DeathEventHandler {
             CheckpointData data = CheckpointData.get(level);
 
             // Check if the player is the anchor player
-            if (player.getUUID().equals(data.getAnchorPlayerUUID())) {
-                // Reset the world
-                CheckpointManager.restoreCheckpoint(player);
-
-                // Notify all players
-                level.getServer().getPlayerList().getPlayers().forEach(p -> {
-                    p.displayClientMessage(Component.literal("The anchor player has died! Resetting the world."), true);
-                });
-
-                // Play sound to indicate reset
-                player.serverLevel().playSound(
-                        null,
-                        player.blockPosition(),
-                        ModSoundEvents.DEATH_CHIME.get(),
-                        SoundSource.PLAYERS,
-                        1.0F,
-                        1.0F
-                );
-
-                // Cancel the death
-                event.setCanceled(true);
-                return;
+            if (data.getAnchorPlayerUUID() == null || !player.getUUID().equals(data.getAnchorPlayerUUID())) {
+                return; // Do nothing if the player is not the anchor player
             }
 
-            // Handle non-anchor players' deaths
-            if (data.getCheckpointPos() != null) {
-                // Play sound for checkpoint restoration
-                player.serverLevel().playSound(
-                        null,
-                        player.blockPosition(),
-                        ModSoundEvents.DEATH_CHIME.get(),
-                        SoundSource.PLAYERS,
-                        1.0F,
-                        1.0F
-                );
+            // Reset the world when the anchor player dies
+            CheckpointManager.restoreCheckpoint(player);
 
-                // Cancel death and restore checkpoint
-                event.setCanceled(true);
-                CheckpointManager.restoreCheckpoint(player);
+            // Notify all players
+            level.getServer().getPlayerList().getPlayers().forEach(p -> {
+                //p.displayClientMessage(Component.literal("The anchor player has died! Resetting the world."), true);
 
-                // Restore health
-                player.setHealth(Math.max(data.getCheckpointHealth(), 1.0F));
-            }
+                // Restore their individual states
+                if (!p.getUUID().equals(data.getAnchorPlayerUUID())) {
+                    CheckpointManager.restoreCheckpoint(p);
+                }
+            });
+
+            // Play the chime sound for all players
+            level.playSound(
+                    null,
+                    player.blockPosition(),
+                    ModSoundEvents.DEATH_CHIME.get(),
+                    SoundSource.PLAYERS,
+                    1.0F,
+                    1.0F
+            );
+
+            // Cancel the death of the anchor player
+            event.setCanceled(true);
+
         } catch (Exception e) {
             e.printStackTrace();
         }

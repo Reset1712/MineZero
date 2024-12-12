@@ -8,12 +8,25 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public class CheckpointData extends SavedData {
     public static final String DATA_NAME = "minezero_checkpoint";
+
+    private Map<UUID, CompoundTag> playersData = new HashMap<>();
+
+    public void savePlayerData(UUID uuid, PlayerData pdata) {
+        playersData.put(uuid, pdata.toNBT());
+        setDirty();
+    }
+
+    public PlayerData getPlayerData(UUID uuid) {
+        if (playersData.containsKey(uuid)) {
+            return PlayerData.fromNBT(playersData.get(uuid));
+        }
+        return null;
+    }
+
 
     private int fireTicks;
 
@@ -92,6 +105,15 @@ public class CheckpointData extends SavedData {
             data.setAnchorPlayerUUID(nbt.getUUID("AnchorPlayerUUID"));
         }
 
+        if (nbt.contains("PlayersData")) {
+            CompoundTag playersTag = nbt.getCompound("PlayersData");
+            for (String key : playersTag.getAllKeys()) {
+                UUID uuid = UUID.fromString(key);
+                data.playersData.put(uuid, playersTag.getCompound(key));
+            }
+        }
+
+
         return data;
     }
 
@@ -135,6 +157,12 @@ public class CheckpointData extends SavedData {
         if (anchorPlayerUUID != null) {
             nbt.putUUID("AnchorPlayerUUID", anchorPlayerUUID);
         }
+
+        CompoundTag playersTag = new CompoundTag();
+        for (Map.Entry<UUID, CompoundTag> entry : playersData.entrySet()) {
+            playersTag.put(entry.getKey().toString(), entry.getValue());
+        }
+        nbt.put("PlayersData", playersTag);
 
         return nbt;
     }
