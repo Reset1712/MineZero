@@ -2,26 +2,42 @@ package boomcow.minezero.event;
 
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
+import boomcow.minezero.checkpoint.PlayerData;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.OutgoingChatMessage;
+import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraft.sounds.SoundSource;
 import boomcow.minezero.ModSoundEvents;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class DeathEventHandler {
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onPlayerDeath(LivingDeathEvent event) {
+        Logger logger = LogManager.getLogger();
         try {
             if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
 
             ServerLevel level = player.serverLevel();
             CheckpointData data = CheckpointData.get(level);
 
+
+
             // Check if the player is the anchor player
             if (data.getAnchorPlayerUUID() == null || !player.getUUID().equals(data.getAnchorPlayerUUID())) {
+
                 return; // Do nothing if the player is not the anchor player
             }
 
@@ -30,6 +46,7 @@ public class DeathEventHandler {
 
             // Notify all players
             level.getServer().getPlayerList().getPlayers().forEach(p -> {
+
                 //p.displayClientMessage(Component.literal("The anchor player has died! Resetting the world."), true);
 
                 // Restore their individual states
@@ -38,21 +55,27 @@ public class DeathEventHandler {
                 }
             });
 
+
             // Play the chime sound for all players
             level.playSound(
                     null,
                     player.blockPosition(),
                     ModSoundEvents.DEATH_CHIME.get(),
                     SoundSource.PLAYERS,
-                    1.0F,
+                    0.8F,
                     1.0F
             );
+
 
             // Cancel the death of the anchor player
             event.setCanceled(true);
 
+
         } catch (Exception e) {
+            logger.error(e.getMessage(), e);
             e.printStackTrace();
         }
     }
+
 }
+

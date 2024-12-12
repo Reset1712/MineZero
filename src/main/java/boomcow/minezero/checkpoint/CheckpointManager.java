@@ -10,6 +10,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +20,8 @@ import java.util.stream.StreamSupport;
 public class CheckpointManager {
 
     public static void setCheckpoint(ServerPlayer anchorPlayer) {
+        Logger logger = LogManager.getLogger();
+        logger.info("Setting checkpoint...");
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
 
@@ -76,13 +80,20 @@ public class CheckpointManager {
             }
         }
         data.setGroundItems(groundItemsList);
+
     }
 
     public static void restoreCheckpoint(ServerPlayer anchorPlayer) {
+        Logger logger = LogManager.getLogger();
+        logger.debug("Restoring checkpoint...");
         try {
             ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
-            if (data.getCheckpointPos() == null) {
+            logger.info("checkpoint health" + data.getCheckpointHealth());
+
+            logger.info("anchor health" + data.getPlayerData(data.getAnchorPlayerUUID()).health);
+            if (data.getPlayerData(data.getAnchorPlayerUUID()) == null) {
+                logger.error("Player data is null!");
                 return;
             }
             // Restore day time
@@ -93,6 +104,7 @@ public class CheckpointManager {
                 PlayerData pdata = data.getPlayerData(player.getUUID());
                 if (pdata != null) {
                     // Restore position
+                    logger.info("Restoring position for player: " + player.getName().getString());
                     player.teleportTo(level, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
 
                     // Restore health, hunger, xp, fire ticks
@@ -121,6 +133,7 @@ public class CheckpointManager {
             }
 
             // Restore mobs and players from checkpoint data
+            logger.info("Restoring entities...");
             List<CompoundTag> entities = data.getEntityData();
             if (entities != null) {
                 for (CompoundTag eNBT : entities) {
@@ -148,6 +161,7 @@ public class CheckpointManager {
 
 
         } catch (Exception e) {
+            logger.error(e.getMessage(), e);
             e.printStackTrace();
         }
     }

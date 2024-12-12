@@ -171,6 +171,25 @@ public class CheckpointData extends SavedData {
         return level.getDataStorage().computeIfAbsent(CheckpointData::load, CheckpointData::new, DATA_NAME);
     }
 
+    public String toString(ServerLevel level) {
+        CheckpointData data = get(level); // Call the get method to retrieve the data
+        StringBuilder sb = new StringBuilder();
+        sb.append("CheckpointData:\n");
+        sb.append("AnchorPlayerUUID: ").append(data.getAnchorPlayerUUID()).append("\n");
+        sb.append("CheckpointPos: ").append(data.getCheckpointPos()).append("\n");
+        sb.append("CheckpointHealth: ").append(data.getCheckpointHealth()).append("\n");
+        sb.append("CheckpointHunger: ").append(data.getCheckpointHunger()).append("\n");
+        sb.append("CheckpointXP: ").append(data.getCheckpointXP()).append("\n");
+        sb.append("CheckpointDayTime: ").append(data.getCheckpointDayTime()).append("\n");
+        sb.append("FireTicks: ").append(data.getFireTicks()).append("\n");
+        sb.append("EntityData: ").append(data.getEntityData()).append("\n");
+        sb.append("GroundItems: ").append(data.getGroundItems()).append("\n");
+        sb.append("CheckpointInventory: ").append(data.getCheckpointInventory()).append("\n");
+        sb.append("PlayersData: ").append(data.playersData).append("\n");
+        return sb.toString();
+    }
+
+
     public void setCheckpointPos(BlockPos pos) {
         this.checkpointPos = pos;
         this.setDirty();
