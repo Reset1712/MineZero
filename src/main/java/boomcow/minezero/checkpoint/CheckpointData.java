@@ -4,15 +4,25 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.Level;
 
 import java.util.*;
 
 public class CheckpointData extends SavedData {
-    public static final String DATA_NAME = "minezero_checkpoint";
+    public static final String DATA_NAME = "global_checkpoint";
+    private ResourceKey<Level> checkpointDimension; // Track the dimension
+    public void setCheckpointDimension(ResourceKey<Level> dimension) {
+        this.checkpointDimension = dimension;
+        this.setDirty();
+    }
 
+    public ResourceKey<Level> getCheckpointDimension() {
+        return checkpointDimension;
+    }
     private Map<UUID, CompoundTag> playersData = new HashMap<>();
 
     public void savePlayerData(UUID uuid, PlayerData pdata) {
@@ -59,6 +69,7 @@ public class CheckpointData extends SavedData {
 
     private long checkpointDayTime;
     private List<CompoundTag> entityData = new ArrayList<>();
+    private List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
     private List<CompoundTag> groundItems = new ArrayList<>();
 
     public CheckpointData() {}
@@ -168,7 +179,8 @@ public class CheckpointData extends SavedData {
     }
 
     public static CheckpointData get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(CheckpointData::load, CheckpointData::new, DATA_NAME);
+        return level.getServer().overworld().getDataStorage()
+                .computeIfAbsent(CheckpointData::load, CheckpointData::new, CheckpointData.DATA_NAME);
     }
 
     public String toString(ServerLevel level) {
@@ -256,6 +268,14 @@ public class CheckpointData extends SavedData {
 
     public List<CompoundTag> getEntityData() {
         return entityData;
+    }
+    public List<ResourceKey<Level>> getEntityDimensions() {
+        return entityDimensions;
+    }
+    public void setEntityDataWithDimensions(List<CompoundTag> entities, List<ResourceKey<Level>> dimensions) {
+        this.entityData = entities;
+        this.entityDimensions = dimensions;
+        this.setDirty();
     }
 
     public List<CompoundTag> getGroundItems() {

@@ -1,7 +1,11 @@
 package boomcow.minezero.checkpoint;
 
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +20,7 @@ public class PlayerData {
     public int hunger;
     public int xp;
     public int fireTicks;
+    public ResourceKey<Level> dimension;
     public List<ItemStack> inventory = new ArrayList<>();
 
     public CompoundTag toNBT() {
@@ -29,6 +34,11 @@ public class PlayerData {
         tag.putInt("Hunger", hunger);
         tag.putInt("XP", xp);
         tag.putInt("FireTicks", fireTicks);
+
+        // Save dimension
+        if (dimension != null) {
+            tag.putString("Dimension", dimension.location().toString());
+        }
 
         CompoundTag invTag = new CompoundTag();
         for (int i = 0; i < inventory.size(); i++) {
@@ -52,6 +62,11 @@ public class PlayerData {
         data.hunger = tag.getInt("Hunger");
         data.xp = tag.getInt("XP");
         data.fireTicks = tag.getInt("FireTicks");
+
+        // Load dimension
+        if (tag.contains("Dimension")) {
+            data.dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("Dimension")));
+        }
 
         CompoundTag invTag = tag.getCompound("Inventory");
         data.inventory.clear();

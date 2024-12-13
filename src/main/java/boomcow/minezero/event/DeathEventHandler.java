@@ -41,6 +41,7 @@ public class DeathEventHandler {
                 return; // Do nothing if the player is not the anchor player
             }
 
+
             // Reset the world when the anchor player dies
             CheckpointManager.restoreCheckpoint(player);
 
@@ -51,12 +52,12 @@ public class DeathEventHandler {
 
                 // Restore their individual states
                 if (!p.getUUID().equals(data.getAnchorPlayerUUID())) {
-                    CheckpointManager.restoreCheckpoint(p);
+                    //CheckpointManager.restoreCheckpoint(p);
                 }
             });
 
 
-            // Play the chime sound for all players
+
             level.playSound(
                     null,
                     player.blockPosition(),

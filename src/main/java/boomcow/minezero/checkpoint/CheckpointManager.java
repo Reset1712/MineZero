@@ -1,9 +1,12 @@
 package boomcow.minezero.checkpoint;
 
+import boomcow.minezero.ModSoundEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -12,6 +15,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +41,7 @@ public class CheckpointManager {
             pdata.posZ = player.getZ();
             pdata.yaw = player.getYRot();
             pdata.pitch = player.getXRot();
+            pdata.dimension = player.level().dimension(); // Save dimension
 
             // Store health, hunger, xp
             pdata.health = player.getHealth();
@@ -59,16 +64,22 @@ public class CheckpointManager {
 
         // Save only mobs and players
         List<CompoundTag> entityList = new ArrayList<>();
-        for (Entity e : level.getAllEntities()) {
-            if (e instanceof Mob || e instanceof ServerPlayer) {
-                CompoundTag entityNBT = new CompoundTag();
-                e.save(entityNBT);
-                if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
-                    entityList.add(entityNBT);
+        List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
+        for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
+            for (Entity entity : serverLevel.getAllEntities()) {
+                if (entity instanceof Mob || entity instanceof ServerPlayer) {
+                    CompoundTag entityNBT = new CompoundTag();
+                    entity.save(entityNBT);
+
+                    if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
+                        entityList.add(entityNBT);
+                        entityDimensions.add(serverLevel.dimension()); // Save the dimension
+                    }
                 }
             }
         }
-        data.setEntityData(entityList);
+
+        data.setEntityDataWithDimensions(entityList, entityDimensions);
 
         // Save items on the ground
         List<CompoundTag> groundItemsList = new ArrayList<>();
@@ -103,12 +114,39 @@ public class CheckpointManager {
             for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
                 PlayerData pdata = data.getPlayerData(player.getUUID());
                 if (pdata != null) {
-                    // Restore position
-                    logger.info("Restoring position for player: " + player.getName().getString());
-                    player.teleportTo(level, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                    // Switch player to the correct dimension
+                    logger.info("Player dimension: " + player.level().dimension() + ", Checkpoint dimension: " + pdata.dimension);
+                    if (!player.level().dimension().equals(pdata.dimension)) {
+                        ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
+                        if (targetLevel != null) {
+                            player.setHealth(pdata.health);
+                            player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                            targetLevel.playSound(
+                                    null,
+                                    player.blockPosition(),
+                                    ModSoundEvents.DEATH_CHIME.get(),
+                                    SoundSource.PLAYERS,
+                                    0.8F,
+                                    1.0F
+                            );
+                        }
+                    } else {
+                        // Restore position within the same dimension
+                        player.setHealth(pdata.health);
+                        ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
+                        player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                        level.playSound(
+                                null,
+                                player.blockPosition(),
+                                ModSoundEvents.DEATH_CHIME.get(),
+                                SoundSource.PLAYERS,
+                                0.8F,
+                                1.0F
+                        );
+                    }
 
                     // Restore health, hunger, xp, fire ticks
-                    player.setHealth(pdata.health);
+
                     player.getFoodData().setFoodLevel(pdata.hunger);
                     player.setExperiencePoints(pdata.xp);
                     player.setRemainingFireTicks(pdata.fireTicks);
@@ -121,25 +159,41 @@ public class CheckpointManager {
                 }
             }
 
-            // Remove all non-player entities
+            // Remove all non-player entities across all dimensions
             List<Entity> entitiesToRemove = new ArrayList<>();
-            for (Entity entity : level.getAllEntities()) {
-                if (!(entity instanceof ServerPlayer) && !entity.isRemoved()) {
-                    entitiesToRemove.add(entity);
+
+            // Iterate over all loaded dimensions
+            for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
+                // Collect non-player entities to remove
+                for (Entity entity : serverLevel.getAllEntities()) {
+                    if (!(entity instanceof ServerPlayer) && !entity.isRemoved()) {
+                        entitiesToRemove.add(entity);
+                    }
                 }
-            }
-            for (Entity entity : entitiesToRemove) {
-                entity.discard();
+
+                // Remove collected entities in this dimension
+                for (Entity entity : entitiesToRemove) {
+                    entity.discard(); // Safely discard the entity
+                }
+
+                // Clear the list for the next dimension
+                entitiesToRemove.clear();
             }
 
             // Restore mobs and players from checkpoint data
             logger.info("Restoring entities...");
             List<CompoundTag> entities = data.getEntityData();
-            if (entities != null) {
-                for (CompoundTag eNBT : entities) {
-                    EntityType.loadEntityRecursive(eNBT, level, (entity) -> {
+            List<ResourceKey<Level>> entityDimensions = data.getEntityDimensions();
+
+            for (int i = 0; i < entities.size(); i++) {
+                CompoundTag eNBT = entities.get(i);
+                ResourceKey<Level> entityDim = entityDimensions.get(i);
+
+                ServerLevel targetLevel = level.getServer().getLevel(entityDim);
+                if (targetLevel != null) {
+                    EntityType.loadEntityRecursive(eNBT, targetLevel, (entity) -> {
                         if (entity != null) {
-                            level.addFreshEntity(entity);
+                            targetLevel.addFreshEntity(entity);
                         }
                         return entity;
                     });
