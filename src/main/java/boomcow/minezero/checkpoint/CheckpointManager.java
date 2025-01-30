@@ -129,12 +129,23 @@ public class CheckpointManager {
             level.setDayTime(worldData.getDayTime());
 
             // Restore only modified blocks to air
-            logger.info("Restoring modified blocks...");
+//            logger.info("Restoring modified blocks...");
             for (BlockPos pos : WorldData.modifiedBlocks) {
                 BlockState currentState = level.getBlockState(pos);
                 if (!currentState.isAir()) {
-                    logger.info("Resetting " + pos + " back to air.");
+//                    logger.info("Resetting " + pos + " back to air.");
                     level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+
+            for (Map.Entry<BlockPos, BlockState> entry : WorldData.minedBlocks.entrySet()) {
+                BlockPos pos = entry.getKey();
+                BlockState originalState = entry.getValue();
+                BlockState currentState = level.getBlockState(pos);
+
+                if (currentState.isAir()) { // Only restore if block was mined
+//                    logger.info("Restoring mined block at " + pos + " to " + originalState);
+                    level.setBlock(pos, originalState, 3);
                 }
             }
 
@@ -151,7 +162,7 @@ public class CheckpointManager {
 //                logger.info("Checking block at " + pos + " - Saved: " + savedState + ", Current: " + currentState);
 
                 if (!currentState.getBlock().equals(savedState.getBlock())) {
-                    logger.info("UPDATING block at " + pos + " from " + currentState + " to " + savedState);
+//                    logger.info("UPDATING block at " + pos + " from " + currentState + " to " + savedState);
                     level.setBlock(pos, savedState, 3);
                 }
             }
@@ -159,7 +170,7 @@ public class CheckpointManager {
 
 
             // Restore all block entities
-            logger.info("Restoring block entities...");
+//            logger.info("Restoring block entities...");
             for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
                 BlockEntity blockEntity = level.getBlockEntity(entry.getKey());
                 if (blockEntity != null) {
@@ -209,6 +220,7 @@ public class CheckpointManager {
                     player.getFoodData().setFoodLevel(pdata.hunger);
                     player.setExperiencePoints(pdata.xp);
                     player.setRemainingFireTicks(pdata.fireTicks);
+//                    logger.info("remaining fire ticks: " + pdata.fireTicks);
 
                     // Restore potion effects
                     player.removeAllEffects();
@@ -246,7 +258,7 @@ public class CheckpointManager {
             }
 
             // Restore mobs and players from checkpoint data
-            logger.info("Restoring entities...");
+//            logger.info("Restoring entities...");
             List<CompoundTag> entities = data.getEntityData();
             List<ResourceKey<Level>> entityDimensions = data.getEntityDimensions();
 

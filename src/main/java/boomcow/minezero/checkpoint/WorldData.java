@@ -24,9 +24,14 @@ public class WorldData {
     private Map<BlockPos, CompoundTag> blockEntityData;
     private Set<ChunkPos> processedChunks = new HashSet<>();
     private List<BlockState> blockStates = new ArrayList<>();
-    private List<BlockPos> blockPositions = new ArrayList<>();
+    public static final List<BlockPos> blockPositions = new ArrayList<>();
 
     public static final Set<BlockPos> modifiedBlocks = new HashSet<>();
+    public static final Map<BlockPos, BlockState> minedBlocks = new HashMap<>();
+
+    public Map<BlockPos, BlockState> getMinedBlocks() {
+        return minedBlocks;
+    }
 
 
     public void saveBlockState(BlockPos pos, BlockState state) {
@@ -70,6 +75,7 @@ public class WorldData {
     }
 
     public void clearWorldData() {
+        this.minedBlocks.clear();
         this.modifiedBlocks.clear();
         this.blockStates.clear();
         this.blockPositions.clear();

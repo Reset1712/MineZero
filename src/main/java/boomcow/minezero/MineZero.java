@@ -1,6 +1,7 @@
 package boomcow.minezero;
 
 import boomcow.minezero.event.BlockChangeListener;
+import boomcow.minezero.event.ExplosionEventHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.BlockItem;
