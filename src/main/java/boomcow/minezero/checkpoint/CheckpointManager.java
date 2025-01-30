@@ -128,54 +128,61 @@ public class CheckpointManager {
             // Restore day time
             level.setDayTime(worldData.getDayTime());
 
-            // Restore only modified blocks to air
-//            logger.info("Restoring modified blocks...");
+            // Restore only modified blocks to air in the correct dimensions
             for (BlockPos pos : WorldData.modifiedBlocks) {
-                BlockState currentState = level.getBlockState(pos);
-                if (!currentState.isAir()) {
-//                    logger.info("Resetting " + pos + " back to air.");
-                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
+
+                if (dimLevel != null) {
+                    BlockState currentState = dimLevel.getBlockState(pos);
+                    if (!currentState.isAir()) {
+                        dimLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                    }
                 }
             }
 
+            // Restore mined blocks in the correct dimensions
             for (Map.Entry<BlockPos, BlockState> entry : WorldData.minedBlocks.entrySet()) {
                 BlockPos pos = entry.getKey();
                 BlockState originalState = entry.getValue();
-                BlockState currentState = level.getBlockState(pos);
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
 
-                if (currentState.isAir()) { // Only restore if block was mined
-//                    logger.info("Restoring mined block at " + pos + " to " + originalState);
-                    level.setBlock(pos, originalState, 3);
+                if (dimLevel != null) {
+                    BlockState currentState = dimLevel.getBlockState(pos);
+                    if (currentState.isAir()) {
+                        dimLevel.setBlock(pos, originalState, 3);
+                    }
                 }
             }
 
-
-            // Restore all block states
-//            logger.info("Restoring block states...");
-//            logger.info("Block states: " + worldData.getBlockStates().size() + ", Block positions: " + worldData.getBlockPositions().size());
+            // Restore all saved block states in the correct dimensions
             for (int i = 0; i < worldData.getBlockStates().size(); i++) {
                 BlockPos pos = worldData.getBlockPositions().get(i);
                 BlockState savedState = worldData.getBlockStates().get(i);
-                BlockState currentState = level.getBlockState(pos);
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
 
-                // Log saved and current states
-//                logger.info("Checking block at " + pos + " - Saved: " + savedState + ", Current: " + currentState);
-
-                if (!currentState.getBlock().equals(savedState.getBlock())) {
-//                    logger.info("UPDATING block at " + pos + " from " + currentState + " to " + savedState);
-                    level.setBlock(pos, savedState, 3);
+                if (dimLevel != null) {
+                    BlockState currentState = dimLevel.getBlockState(pos);
+                    if (!currentState.getBlock().equals(savedState.getBlock())) {
+                        dimLevel.setBlock(pos, savedState, 3);
+                    }
                 }
             }
 
-
-
-            // Restore all block entities
-//            logger.info("Restoring block entities...");
+            // Restore block entities in the correct dimensions
             for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
-                BlockEntity blockEntity = level.getBlockEntity(entry.getKey());
-                if (blockEntity != null) {
-                    blockEntity.load(entry.getValue());
-                    blockEntity.setChanged();
+                BlockPos pos = entry.getKey();
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
+
+                if (dimLevel != null) {
+                    BlockEntity blockEntity = dimLevel.getBlockEntity(pos);
+                    if (blockEntity != null) {
+                        blockEntity.load(entry.getValue());
+                        blockEntity.setChanged();
+                    }
                 }
             }
 
