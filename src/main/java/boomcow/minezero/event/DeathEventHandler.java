@@ -6,6 +6,8 @@ import boomcow.minezero.checkpoint.PlayerData;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.OutgoingChatMessage;
 import net.minecraft.network.chat.PlayerChatMessage;
+import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -58,14 +60,18 @@ public class DeathEventHandler {
 
 
 
-            level.playSound(
-                    null,
-                    player.blockPosition(),
-                    ModSoundEvents.DEATH_CHIME.get(),
-                    SoundSource.PLAYERS,
-                    0.8F,
-                    1.0F
+            // Stop previous death chime
+            ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
+                    new ResourceLocation("minezero", "death_chime"), // The exact sound name
+                    SoundSource.PLAYERS
             );
+            player.connection.send(stopSoundPacket);
+
+            // Play new death chime
+            player.playNotifySound(ModSoundEvents.DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
+
+
+
 
 
             // Cancel the death of the anchor player

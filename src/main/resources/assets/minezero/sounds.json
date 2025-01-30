@@ -3,5 +3,10 @@
     "sounds": [
       { "name": "minezero:death_chime" }
     ]
+  },
+  "empty_sound": {
+    "sounds": [
+      { "name": "minezero:empty_sound" }
+    ]
   }
 }
