@@ -7,18 +7,23 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 
 public class CheckpointManager {
@@ -28,6 +33,9 @@ public class CheckpointManager {
         logger.info("Setting checkpoint...");
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
+
+        // Save world data
+        data.saveWorldData(level);
 
         // Set the anchor player
         data.setAnchorPlayerUUID(anchorPlayer.getUUID());
@@ -48,6 +56,12 @@ public class CheckpointManager {
             pdata.hunger = player.getFoodData().getFoodLevel();
             pdata.xp = player.experienceLevel; // or setExperiencePoints if needed
             pdata.fireTicks = player.getRemainingFireTicks();
+
+            // Store potion effects
+            pdata.potionEffects.clear();
+            for (MobEffectInstance effect : player.getActiveEffects()) {
+                pdata.potionEffects.add(new MobEffectInstance(effect));
+            }
 
             // Store inventory
             pdata.inventory.clear();
@@ -92,30 +106,75 @@ public class CheckpointManager {
         }
         data.setGroundItems(groundItemsList);
 
+        logger.info("Checkpoint set");
+
     }
 
     public static void restoreCheckpoint(ServerPlayer anchorPlayer) {
         Logger logger = LogManager.getLogger();
         logger.debug("Restoring checkpoint...");
+        logger.debug(" ");
         try {
             ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
-            logger.info("checkpoint health" + data.getCheckpointHealth());
+            WorldData worldData = data.getWorldData();
+//            logger.info("checkpoint health" + data.getCheckpointHealth());
 
-            logger.info("anchor health" + data.getPlayerData(data.getAnchorPlayerUUID()).health);
+//            logger.info("anchor health" + data.getPlayerData(data.getAnchorPlayerUUID()).health);
             if (data.getPlayerData(data.getAnchorPlayerUUID()) == null) {
                 logger.error("Player data is null!");
                 return;
             }
             // Restore day time
-            level.setDayTime(data.getCheckpointDayTime());
+            level.setDayTime(worldData.getDayTime());
+
+            // Restore only modified blocks to air
+            logger.info("Restoring modified blocks...");
+            for (BlockPos pos : WorldData.modifiedBlocks) {
+                BlockState currentState = level.getBlockState(pos);
+                if (!currentState.isAir()) {
+                    logger.info("Resetting " + pos + " back to air.");
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+
+
+            // Restore all block states
+//            logger.info("Restoring block states...");
+//            logger.info("Block states: " + worldData.getBlockStates().size() + ", Block positions: " + worldData.getBlockPositions().size());
+            for (int i = 0; i < worldData.getBlockStates().size(); i++) {
+                BlockPos pos = worldData.getBlockPositions().get(i);
+                BlockState savedState = worldData.getBlockStates().get(i);
+                BlockState currentState = level.getBlockState(pos);
+
+                // Log saved and current states
+//                logger.info("Checking block at " + pos + " - Saved: " + savedState + ", Current: " + currentState);
+
+                if (!currentState.getBlock().equals(savedState.getBlock())) {
+                    logger.info("UPDATING block at " + pos + " from " + currentState + " to " + savedState);
+                    level.setBlock(pos, savedState, 3);
+                }
+            }
+
+
+
+            // Restore all block entities
+            logger.info("Restoring block entities...");
+            for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
+                BlockEntity blockEntity = level.getBlockEntity(entry.getKey());
+                if (blockEntity != null) {
+                    blockEntity.load(entry.getValue());
+                    blockEntity.setChanged();
+                }
+            }
+
 
             // Restore all players from their saved data
             for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
                 PlayerData pdata = data.getPlayerData(player.getUUID());
                 if (pdata != null) {
                     // Switch player to the correct dimension
-                    logger.info("Player dimension: " + player.level().dimension() + ", Checkpoint dimension: " + pdata.dimension);
+//                    logger.info("Player dimension: " + player.level().dimension() + ", Checkpoint dimension: " + pdata.dimension);
                     if (!player.level().dimension().equals(pdata.dimension)) {
                         ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
                         if (targetLevel != null) {
@@ -150,6 +209,12 @@ public class CheckpointManager {
                     player.getFoodData().setFoodLevel(pdata.hunger);
                     player.setExperiencePoints(pdata.xp);
                     player.setRemainingFireTicks(pdata.fireTicks);
+
+                    // Restore potion effects
+                    player.removeAllEffects();
+                    for (MobEffectInstance effect : pdata.potionEffects) {
+                        player.addEffect(new MobEffectInstance(effect));
+                    }
 
                     // Restore inventory
                     player.getInventory().clearContent();
@@ -213,6 +278,7 @@ public class CheckpointManager {
                 }
             }
 
+            logger.info("Checkpoint restored");
 
         } catch (Exception e) {
             logger.error(e.getMessage(), e);

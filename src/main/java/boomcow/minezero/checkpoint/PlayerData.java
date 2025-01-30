@@ -2,8 +2,10 @@ package boomcow.minezero.checkpoint;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -23,6 +25,8 @@ public class PlayerData {
     public ResourceKey<Level> dimension;
     public List<ItemStack> inventory = new ArrayList<>();
 
+    public List<MobEffectInstance> potionEffects = new ArrayList<>();
+
     public CompoundTag toNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putDouble("PosX", posX);
@@ -34,6 +38,15 @@ public class PlayerData {
         tag.putInt("Hunger", hunger);
         tag.putInt("XP", xp);
         tag.putInt("FireTicks", fireTicks);
+
+        // Save potion effects
+        ListTag effectsTag = new ListTag();
+        for (MobEffectInstance effect : potionEffects) {
+            CompoundTag effectTag = new CompoundTag();
+            effect.save(effectTag);
+            effectsTag.add(effectTag);
+        }
+        tag.put("PotionEffects", effectsTag);
 
         // Save dimension
         if (dimension != null) {
@@ -47,6 +60,8 @@ public class PlayerData {
             invTag.put("Slot" + i, stackTag);
         }
         tag.put("Inventory", invTag);
+
+
 
         return tag;
     }
@@ -62,6 +77,17 @@ public class PlayerData {
         data.hunger = tag.getInt("Hunger");
         data.xp = tag.getInt("XP");
         data.fireTicks = tag.getInt("FireTicks");
+
+        // Load potion effects
+        data.potionEffects.clear();
+        ListTag effectsTag = tag.getList("PotionEffects", 10);
+        for (int i = 0; i < effectsTag.size(); i++) {
+            CompoundTag effectTag = effectsTag.getCompound(i);
+            MobEffectInstance effect = MobEffectInstance.load(effectTag);
+            if (effect != null) {
+                data.potionEffects.add(effect);
+            }
+        }
 
         // Load dimension
         if (tag.contains("Dimension")) {

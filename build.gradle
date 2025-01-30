@@ -5,7 +5,7 @@ plugins {
 
 
 group = 'BoomCow'
-version = '1.0-SNAPSHOT'
+version = '1.02'
 
 
 java {
@@ -109,7 +109,7 @@ jar {
         attributes([
                 "Specification-Title": "minezero",
                 //"Specification-Vendor": "minezero authors",
-                "Specification-Version": "1", // We are version 1 of ourselves
+                "Specification-Version": "1.02", // We are version 1 of ourselves
                 "Implementation-Title": project.name,
                 "Implementation-Version": project.jar.archiveVersion,
                 //"Implementation-Vendor": "minezero authors",

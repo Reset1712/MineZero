@@ -72,7 +72,21 @@ public class CheckpointData extends SavedData {
     private List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
     private List<CompoundTag> groundItems = new ArrayList<>();
 
-    public CheckpointData() {}
+    private WorldData worldData = new WorldData();
+
+    public CheckpointData() {
+    }
+
+    public WorldData getWorldData() {
+        return this.worldData;
+    }
+
+    public void saveWorldData(ServerLevel level) {
+        this.worldData.clearWorldData();
+        this.worldData.saveAllLoadedChunks(level);
+        this.worldData.saveDayTime(level.getDayTime());
+        this.setDirty();
+    }
 
     public static CheckpointData load(CompoundTag nbt) {
         CheckpointData data = new CheckpointData();
@@ -128,53 +142,9 @@ public class CheckpointData extends SavedData {
         return data;
     }
 
+    // Saves nbt data to a compound tag
     @Override
     public CompoundTag save(CompoundTag nbt) {
-        if (checkpointPos != null) {
-            nbt.putInt("PosX", checkpointPos.getX());
-            nbt.putInt("PosY", checkpointPos.getY());
-            nbt.putInt("PosZ", checkpointPos.getZ());
-        }
-        nbt.putFloat("Health", checkpointHealth);
-        nbt.putInt("Hunger", checkpointHunger);
-        nbt.putInt("XP", checkpointXP);
-
-        nbt.putLong("DayTime", checkpointDayTime);
-
-        // Save inventory
-        ListTag invList = new ListTag();
-        for (ItemStack stack : checkpointInventory) {
-            CompoundTag stackTag = new CompoundTag();
-            stack.save(stackTag);
-            invList.add(stackTag);
-        }
-        nbt.put("Inventory", invList);
-
-        // Save entities
-        ListTag entityList = new ListTag();
-        for (CompoundTag eNBT : entityData) {
-            entityList.add(eNBT);
-        }
-        nbt.put("Entities", entityList);
-
-        // Save ground items
-        ListTag groundItemsList = new ListTag();
-        for (CompoundTag itemNBT : groundItems) {
-            groundItemsList.add(itemNBT);
-        }
-        nbt.put("GroundItems", groundItemsList);
-        nbt.putInt("FireTicks", fireTicks);
-
-        if (anchorPlayerUUID != null) {
-            nbt.putUUID("AnchorPlayerUUID", anchorPlayerUUID);
-        }
-
-        CompoundTag playersTag = new CompoundTag();
-        for (Map.Entry<UUID, CompoundTag> entry : playersData.entrySet()) {
-            playersTag.put(entry.getKey().toString(), entry.getValue());
-        }
-        nbt.put("PlayersData", playersTag);
-
         return nbt;
     }
 
