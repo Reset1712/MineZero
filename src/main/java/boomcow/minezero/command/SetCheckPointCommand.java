@@ -1,9 +1,11 @@
 package boomcow.minezero.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.arguments.EntityArgument;
 import boomcow.minezero.checkpoint.CheckpointManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -23,9 +25,18 @@ public class SetCheckPointCommand {
                             }
 
                             CheckpointManager.setCheckpoint(player);
-                            source.sendSuccess(() -> Component.literal("Checkpoint set!"), true);
+                            source.sendSuccess(() -> Component.literal("Checkpoint set for yourself!"), true);
                             return 1;
                         })
+                        .then(Commands.argument("target", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "target");
+
+                                    CheckpointManager.setCheckpoint(targetPlayer);
+                                    source.sendSuccess(() -> Component.literal("Checkpoint set for " + targetPlayer.getName().getString() + "!"), true);
+                                    return 1;
+                                }))
         );
     }
 }

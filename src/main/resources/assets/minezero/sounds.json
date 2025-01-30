@@ -8,5 +8,10 @@
     "sounds": [
       { "name": "minezero:empty_sound" }
     ]
+  },
+  "flute_chime": {
+    "sounds": [
+      { "name": "minezero:flute_chime" }
+    ]
   }
 }

@@ -18,6 +18,8 @@ public class ModSoundEvents {
     public static final RegistryObject<SoundEvent> EMPTY_SOUND = SOUND_EVENTS.register("empty_sound",
             () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "empty_sound")));
 
+    public static final RegistryObject<SoundEvent> FLUTE_CHIME = SOUND_EVENTS.register("flute_chime",
+            () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "flute_chime")));
 
     public static void register(IEventBus eventBus) {
         SOUND_EVENTS.register(eventBus);
