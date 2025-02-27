@@ -26,6 +26,8 @@ public class PlayerData {
     public List<ItemStack> inventory = new ArrayList<>();
 
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
+    // New field for advancements.
+    public CompoundTag advancements = new CompoundTag();
 
     public CompoundTag toNBT() {
         CompoundTag tag = new CompoundTag();
@@ -47,6 +49,11 @@ public class PlayerData {
             effectsTag.add(effectTag);
         }
         tag.put("PotionEffects", effectsTag);
+
+        // Save advancements
+        if (advancements != null) {
+            tag.put("Advancements", advancements);
+        }
 
         // Save dimension
         if (dimension != null) {
@@ -87,6 +94,11 @@ public class PlayerData {
             if (effect != null) {
                 data.potionEffects.add(effect);
             }
+        }
+
+        // Load advancements
+        if (tag.contains("Advancements")) {
+            data.advancements = tag.getCompound("Advancements");
         }
 
         // Load dimension

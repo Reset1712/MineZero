@@ -1,9 +1,13 @@
 package boomcow.minezero.checkpoint;
 
 import boomcow.minezero.ModSoundEvents;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
@@ -72,6 +76,22 @@ public class CheckpointManager {
                 ItemStack stack = player.getInventory().getItem(i).copy();
                 pdata.inventory.add(stack);
             }
+
+            CompoundTag advTag = new CompoundTag();
+            for (Advancement advancement : player.server.getAdvancements().getAllAdvancements()) {
+                AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
+                // Create a tag to hold progress details.
+                CompoundTag progressTag = new CompoundTag();
+
+                // For each criterion, check if it's done.
+                for (String criterion : progress.getCompletedCriteria()) {
+                    progressTag.putBoolean(criterion, true);
+                }
+
+                // Save the progress tag under the advancement's ID.
+                advTag.put(advancement.getId().toString(), progressTag);
+            }
+            pdata.advancements = advTag;
 
             data.savePlayerData(player.getUUID(), pdata);
         }
@@ -250,6 +270,38 @@ public class CheckpointManager {
                     player.removeAllEffects();
                     for (MobEffectInstance effect : pdata.potionEffects) {
                         player.addEffect(new MobEffectInstance(effect));
+                    }
+
+                    // Restore advancements exactly as saved in the checkpoint.
+                    CompoundTag savedAdvTag = pdata.advancements;
+                    ServerAdvancementManager advManager = level.getServer().getAdvancements();
+
+                    for (Advancement advancement : advManager.getAllAdvancements()) {
+                        AdvancementProgress currentProgress = player.getAdvancements().getOrStartProgress(advancement);
+                        CompoundTag savedProgressTag = null;
+                        String advKey = advancement.getId().toString();
+                        if (savedAdvTag.contains(advKey)) {
+                            savedProgressTag = savedAdvTag.getCompound(advKey);
+                        }
+
+                        for (String criterion : advancement.getCriteria().keySet()) {
+                            boolean wasCompleted = savedProgressTag != null && savedProgressTag.getBoolean(criterion);
+                            boolean isCompleted = false;
+                            for (String compCriterion : currentProgress.getCompletedCriteria()) {
+                                if (compCriterion.equals(criterion)) {
+                                    isCompleted = true;
+                                    break;
+                                }
+                            }
+
+                            if (isCompleted && !wasCompleted) {
+                                // Revoke criteria gained after checkpoint.
+                                player.getAdvancements().revoke(advancement, criterion);
+                            } else if (!isCompleted && wasCompleted) {
+                                // Award criteria that were saved in the checkpoint.
+                                player.getAdvancements().award(advancement, criterion);
+                            }
+                        }
                     }
 
                     // Restore inventory
