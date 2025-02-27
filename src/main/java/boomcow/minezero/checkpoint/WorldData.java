@@ -2,7 +2,6 @@ package boomcow.minezero.checkpoint;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
@@ -10,34 +9,44 @@ import net.minecraft.server.level.*;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.lang.reflect.Field;
 import java.util.*;
 
 public class WorldData {
-//    private Map<BlockPos, BlockState> blockStates;
-    private Map<BlockPos, CompoundTag> blockEntityData;
-    private Set<ChunkPos> processedChunks = new HashSet<>();
-    private List<BlockState> blockStates = new ArrayList<>();
+    // Legacy collections for compatibility.
     public static final List<BlockPos> blockPositions = new ArrayList<>();
+    private List<BlockState> blockStates = new ArrayList<>();
+    public static final Map<BlockPos, Integer> blockDimensionIndices = new HashMap<>();
+
+    // Data for block entities.
+    private Map<BlockPos, CompoundTag> blockEntityData;
+
+    // Set of chunks that have already been processed during saving.
+    private Set<ChunkPos> processedChunks = new HashSet<>();
+
+    // New: Saved block states grouped by chunk position.
+    private Map<ChunkPos, List<SavedBlock>> savedBlocksByChunk = new HashMap<>();
+
+    // Dimension mapping for saving dimension information.
     private static final Map<Integer, ResourceKey<Level>> dimensionMap = new HashMap<>();
     private static int nextDimensionIndex = 0; // Auto-incrementing index for dimensions
 
     public static final Set<BlockPos> modifiedBlocks = new HashSet<>();
     public static final Map<BlockPos, BlockState> minedBlocks = new HashMap<>();
-    public static final Map<BlockPos, Integer> blockDimensionIndices = new HashMap<>();
 
-    public Map<BlockPos, BlockState> getMinedBlocks() {
-        return minedBlocks;
+    private long dayTime;
+
+    public WorldData() {
+        this.blockEntityData = new HashMap<>();
+        this.dayTime = 0;
     }
 
     /**
-     * Get or assign an index for a dimension.
+     * Returns an index for the given dimension, creating one if necessary.
      */
     public static int getDimensionIndex(ResourceKey<Level> dimension) {
         for (Map.Entry<Integer, ResourceKey<Level>> entry : dimensionMap.entrySet()) {
@@ -53,24 +62,34 @@ public class WorldData {
     public static ResourceKey<Level> getDimensionFromIndex(int index) {
         return dimensionMap.get(index);
     }
+
+    /**
+     * Saves a block state:
+     *  - Adds the saved block to a chunk-based map for optimized restoration.
+     *  - Updates legacy global lists/maps (blockPositions, blockStates, blockDimensionIndices) for compatibility.
+     */
     public void saveBlockState(BlockPos pos, BlockState state, ResourceKey<Level> dimension) {
+        // Save in the chunk-based structure.
+        ChunkPos chunkPos = new ChunkPos(pos);
+        SavedBlock saved = new SavedBlock(pos, state, dimension);
+        savedBlocksByChunk.computeIfAbsent(chunkPos, k -> new ArrayList<>()).add(saved);
+
+        // Update legacy collections.
         blockPositions.add(pos);
         blockStates.add(state);
         blockDimensionIndices.put(pos, getDimensionIndex(dimension));
     }
 
-    public List<BlockPos> getBlockPositions() {
-        return this.blockPositions;
+    /**
+     * Returns the saved blocks grouped by chunk.
+     */
+    public Map<ChunkPos, List<SavedBlock>> getSavedBlocksByChunk() {
+        return this.savedBlocksByChunk;
     }
 
-
-    private long dayTime;
-
-    public WorldData() {
-        this.blockEntityData = new HashMap<>();
-        this.dayTime = 0;
+    public Map<BlockPos, CompoundTag> getBlockEntityData() {
+        return this.blockEntityData;
     }
-
 
     public void saveBlockEntity(BlockPos pos, CompoundTag blockEntityNBT) {
         if (blockEntityNBT != null) {
@@ -90,10 +109,13 @@ public class WorldData {
         return this.blockStates;
     }
 
-    public Map<BlockPos, CompoundTag> getBlockEntityData() {
-        return this.blockEntityData;
+    public List<BlockPos> getBlockPositions() {
+        return blockPositions;
     }
 
+    /**
+     * Clears all saved world data.
+     */
     public void clearWorldData() {
         minedBlocks.clear();
         modifiedBlocks.clear();
@@ -102,8 +124,13 @@ public class WorldData {
         processedChunks.clear();
         blockEntityData.clear();
         blockDimensionIndices.clear();
+        savedBlocksByChunk.clear();
     }
 
+    /**
+     * Saves all loaded chunks within players' render distance.
+     * Blocks that are air are skipped.
+     */
     public void saveAllLoadedChunks(ServerLevel level) {
         Logger logger = LogManager.getLogger();
         ServerChunkCache chunkCache = level.getChunkSource();
@@ -138,12 +165,13 @@ public class WorldData {
                                     BlockPos pos = new BlockPos(x, y, z);
                                     BlockState state = chunk.getBlockState(pos);
                                     if (!state.isAir()) {
-                                        saveBlockState(pos, state, level.dimension()); // Save with dimension
+                                        saveBlockState(pos, state, level.dimension());
                                     }
                                 }
                             }
                         }
 
+                        // Save block entities.
                         for (BlockPos entityPos : chunk.getBlockEntities().keySet()) {
                             BlockEntity blockEntity = chunk.getBlockEntity(entityPos);
                             if (blockEntity != null && !blockEntity.isRemoved()) {
@@ -156,5 +184,8 @@ public class WorldData {
         }
     }
 
-
+    /**
+     * Record to store saved block data.
+     */
+    public static record SavedBlock(BlockPos pos, BlockState state, ResourceKey<Level> dimension) {}
 }

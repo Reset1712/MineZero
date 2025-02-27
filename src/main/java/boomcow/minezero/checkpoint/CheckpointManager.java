@@ -14,6 +14,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,12 +23,14 @@ import org.apache.logging.log4j.Logger;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
 public class CheckpointManager {
 
+    boolean debug = false;
     public static void setCheckpoint(ServerPlayer anchorPlayer) {
         Logger logger = LogManager.getLogger();
         logger.info("Setting checkpoint...");
@@ -114,6 +117,7 @@ public class CheckpointManager {
         Logger logger = LogManager.getLogger();
         logger.debug("Restoring checkpoint...");
         logger.debug(" ");
+//        long startTime = System.nanoTime();
         try {
             ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
@@ -156,20 +160,33 @@ public class CheckpointManager {
                 }
             }
 
-            // Restore all saved block states in the correct dimensions
-            for (int i = 0; i < worldData.getBlockStates().size(); i++) {
-                BlockPos pos = worldData.getBlockPositions().get(i);
-                BlockState savedState = worldData.getBlockStates().get(i);
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
+            int totalSaved = 0;
+            int updateCount = 0;
 
-                if (dimLevel != null) {
-                    BlockState currentState = dimLevel.getBlockState(pos);
-                    if (!currentState.getBlock().equals(savedState.getBlock())) {
-                        dimLevel.setBlock(pos, savedState, 3);
+            // Assume you have a WorldData instance called worldData.
+            Map<ChunkPos, List<WorldData.SavedBlock>> savedBlocksByChunk = worldData.getSavedBlocksByChunk();
+
+            for (Map.Entry<ChunkPos, List<WorldData.SavedBlock>> entry : savedBlocksByChunk.entrySet()) {
+                List<WorldData.SavedBlock> savedBlocks = entry.getValue();
+                totalSaved += savedBlocks.size();
+
+                // We assume all saved blocks in this list are from the same dimension.
+                ResourceKey<Level> dimension = savedBlocks.get(0).dimension();
+                ServerLevel dimLevel = level.getServer().getLevel(dimension);
+
+                if (dimLevel == null) continue;
+
+                for (WorldData.SavedBlock saved : savedBlocks) {
+                    BlockState currentState = dimLevel.getBlockState(saved.pos());
+                    if (!currentState.getBlock().equals(saved.state().getBlock())) {
+                        updateCount++;
+                        dimLevel.setBlock(saved.pos(), saved.state(), 2); // Use flag 2 to minimize neighbor updates.
                     }
                 }
             }
+
+//            logger.debug("Total saved block states (chunked): {}", totalSaved);
+//            logger.debug("Performed {} block updates.", updateCount);
 
             // Restore block entities in the correct dimensions
             for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
@@ -296,7 +313,9 @@ public class CheckpointManager {
                     });
                 }
             }
-
+//            long endTime = System.nanoTime();
+//            long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+//            logger.debug("Restoring states took {} ms", durationMs);
             logger.info("Checkpoint restored");
 
         } catch (Exception e) {
