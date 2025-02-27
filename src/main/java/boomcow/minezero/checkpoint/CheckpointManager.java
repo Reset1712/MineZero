@@ -176,6 +176,36 @@ public class CheckpointManager {
                 }
             }
 
+            // Restore modified fluid blocks to air in the correct dimensions
+            for (BlockPos pos : WorldData.modifiedFluidBlocks) {
+                logger.debug("Restoring fluid block at " + pos);
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
+                if (dimLevel != null) {
+                    BlockState currentState = dimLevel.getBlockState(pos);
+                    // If a fluid (or any block) is present, clear it by setting air.
+                    if (!currentState.isAir()) {
+                        dimLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+
+// Restore mined fluid blocks (i.e. fluid that was removed) in the correct dimensions
+            for (Map.Entry<BlockPos, BlockState> entry : WorldData.minedFluidBlocks.entrySet()) {
+                BlockPos pos = entry.getKey();
+                BlockState originalState = entry.getValue();
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
+                if (dimLevel != null) {
+                    BlockState currentState = dimLevel.getBlockState(pos);
+                    // If the current block is air (fluid was removed), restore the original fluid state.
+                    if (currentState.isAir()) {
+                        dimLevel.setBlock(pos, originalState, 3);
+                    }
+                }
+            }
+
+
             int totalSaved = 0;
             int updateCount = 0;
 

@@ -38,6 +38,10 @@ public class WorldData {
     public static final Set<BlockPos> modifiedBlocks = new HashSet<>();
     public static final Map<BlockPos, BlockState> minedBlocks = new HashMap<>();
 
+    public static final Set<BlockPos> modifiedFluidBlocks = new HashSet<>();
+    public static final Map<BlockPos, BlockState> minedFluidBlocks = new HashMap<>();
+
+
     private long dayTime;
 
     public WorldData() {
