@@ -15,6 +15,8 @@ public class ModSoundEvents {
     public static final RegistryObject<SoundEvent> DEATH_CHIME = SOUND_EVENTS.register("death_chime",
             () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "death_chime")));
 
+    public static final RegistryObject<SoundEvent> ALT_DEATH_CHIME = SOUND_EVENTS.register("alt_death_chime",
+            () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "alt_death_chime")));
     public static final RegistryObject<SoundEvent> EMPTY_SOUND = SOUND_EVENTS.register("empty_sound",
             () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "empty_sound")));
 

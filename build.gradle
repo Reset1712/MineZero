@@ -4,8 +4,8 @@ plugins {
 }
 
 
-group = 'BoomCow'
-version = '1.03'
+group = 'LethallyGood'
+version = project.findProperty('minezero_version') ?: '1.0.0'
 
 
 java {
@@ -82,6 +82,11 @@ sourceSets.main.resources {
 }
 repositories {
     mavenCentral() // Ensures Maven Central is available
+    maven {
+        name = "Jared's maven"
+        url = "https://maven.blamejared.com"
+    }
+
 }
 
 dependencies {
@@ -98,6 +103,12 @@ dependencies {
     // Examples using mod jars from ./libs
     // implementation fg.deobf("blank:coolmod-${mc_version}:${coolmod_version}")
 
+    // compile against the JEI API but do not include it at runtime
+    compileOnly(fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}"))
+    compileOnly(fg.deobf("mezz.jei:jei-${mc_version}-forge-api:${jei_version}"))
+    // at runtime, use the full JEI jar for Forge
+    runtimeOnly(fg.deobf("mezz.jei:jei-${mc_version}-forge:${jei_version}"))
+
     // For more info...
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
@@ -109,7 +120,7 @@ jar {
         attributes([
                 "Specification-Title": "minezero",
                 //"Specification-Vendor": "minezero authors",
-                "Specification-Version": "1.03", // We are version 1 of ourselves
+                "Specification-Version": project.version, // We are version 1 of ourselves
                 "Implementation-Title": project.name,
                 "Implementation-Version": project.jar.archiveVersion,
                 //"Implementation-Vendor": "minezero authors",
@@ -117,8 +128,6 @@ jar {
         ])
     }
 }
-
-jar.finalizedBy('reobfJar')
 
 jar.finalizedBy('reobfJar')
 

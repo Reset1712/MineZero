@@ -20,6 +20,8 @@ import org.apache.logging.log4j.Logger;
 @Mod.EventBusSubscriber
 public class BlockChangeListener {
 
+
+
     // 1. Solid block placement
     @SubscribeEvent
     public static void onSolidBlockPlace(BlockEvent.EntityPlaceEvent event) {
@@ -39,6 +41,7 @@ public class BlockChangeListener {
     // 2. Solid block break
     @SubscribeEvent
     public static void onSolidBlockBreak(BlockEvent.BreakEvent event) {
+        Logger logger = LogManager.getLogger();
         if (event.getPlayer() instanceof ServerPlayer player) {
             BlockState state = event.getState();
             // Only handle non-fluid breaks.
@@ -49,6 +52,8 @@ public class BlockChangeListener {
                 if (!WorldData.blockPositions.contains(pos)) {
                     WorldData.minedBlocks.put(pos, state);
                     WorldData.blockDimensionIndices.put(pos, dimensionIndex);
+                    logger.debug("broke block...");
+                    logger.debug(WorldData.minedBlocks.size());
                 }
             }
         }

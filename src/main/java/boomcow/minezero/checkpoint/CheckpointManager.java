@@ -34,6 +34,7 @@ public class CheckpointManager {
     public static void setCheckpoint(ServerPlayer anchorPlayer) {
         Logger logger = LogManager.getLogger();
         logger.info("Setting checkpoint...");
+        long startTime = System.nanoTime();
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
 
@@ -124,7 +125,9 @@ public class CheckpointManager {
             }
         }
         data.setGroundItems(groundItemsList);
-
+        long endTime = System.nanoTime();
+        long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+        logger.debug("Saving states took {} ms", durationMs);
         logger.info("Checkpoint set");
 
     }
@@ -133,7 +136,7 @@ public class CheckpointManager {
         Logger logger = LogManager.getLogger();
         logger.debug("Restoring checkpoint...");
         logger.debug(" ");
-//        long startTime = System.nanoTime();
+        long startTime = System.nanoTime();
         try {
             ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
@@ -171,7 +174,7 @@ public class CheckpointManager {
                 if (dimLevel != null) {
                     BlockState currentState = dimLevel.getBlockState(pos);
                     if (currentState.isAir()) {
-                        dimLevel.setBlock(pos, originalState, 3);
+                        dimLevel.setBlock(pos, originalState, 2);
                     }
                 }
             }
@@ -261,28 +264,13 @@ public class CheckpointManager {
                         if (targetLevel != null) {
                             player.setHealth(pdata.health);
                             player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
-                            targetLevel.playSound(
-                                    null,
-                                    player.blockPosition(),
-                                    ModSoundEvents.DEATH_CHIME.get(),
-                                    SoundSource.PLAYERS,
-                                    0.8F,
-                                    1.0F
-                            );
                         }
                     } else {
                         // Restore position within the same dimension
                         player.setHealth(pdata.health);
                         ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
                         player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
-                        level.playSound(
-                                null,
-                                player.blockPosition(),
-                                ModSoundEvents.DEATH_CHIME.get(),
-                                SoundSource.PLAYERS,
-                                0.8F,
-                                1.0F
-                        );
+
                     }
 
                     // Restore health, hunger, xp, fire ticks
@@ -391,9 +379,9 @@ public class CheckpointManager {
                     });
                 }
             }
-//            long endTime = System.nanoTime();
-//            long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
-//            logger.debug("Restoring states took {} ms", durationMs);
+            long endTime = System.nanoTime();
+            long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+            logger.debug("Restoring states took {} ms", durationMs);
             logger.info("Checkpoint restored");
 
         } catch (Exception e) {

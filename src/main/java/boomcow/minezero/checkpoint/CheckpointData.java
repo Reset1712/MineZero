@@ -83,7 +83,7 @@ public class CheckpointData extends SavedData {
 
     public void saveWorldData(ServerLevel level) {
         this.worldData.clearWorldData();
-        this.worldData.saveAllLoadedChunks(level);
+        // this.worldData.saveAllLoadedChunks(level);
         this.worldData.saveDayTime(level.getDayTime());
         this.setDirty();
     }
