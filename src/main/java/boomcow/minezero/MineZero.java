@@ -33,6 +33,8 @@ import boomcow.minezero.items.ArtifactFluteItem;
 import boomcow.minezero.ModSoundEvents;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 
+// test commit
+
 @Mod(MineZero.MODID)
 public class MineZero {
 
