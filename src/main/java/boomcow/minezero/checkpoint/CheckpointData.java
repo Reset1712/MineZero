@@ -70,6 +70,10 @@ public class CheckpointData extends SavedData {
     private long checkpointDayTime;
     private List<CompoundTag> entityData = new ArrayList<>();
     private List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
+    private Map<UUID, UUID> entityAggroTargets = new HashMap<>();
+
+
+
     private List<CompoundTag> groundItems = new ArrayList<>();
 
     private WorldData worldData = new WorldData();
@@ -116,6 +120,16 @@ public class CheckpointData extends SavedData {
                 data.entityData.add(entityList.getCompound(i));
             }
         }
+
+        if (nbt.contains("EntityAggroTargets")) {
+            CompoundTag aggroTag = nbt.getCompound("EntityAggroTargets");
+            for (String key : aggroTag.getAllKeys()) {
+                UUID entityUUID = UUID.fromString(key);
+                UUID targetUUID = aggroTag.getUUID(key);
+                data.entityAggroTargets.put(entityUUID, targetUUID);
+            }
+        }
+
 
         // Load ground items
         if (nbt.contains("GroundItems", Tag.TAG_LIST)) {
@@ -181,6 +195,16 @@ public class CheckpointData extends SavedData {
         this.checkpointHealth = health;
         this.setDirty();
     }
+
+    public void setEntityAggroTargets(Map<UUID, UUID> aggroTargets) {
+        this.entityAggroTargets = aggroTargets;
+        this.setDirty();
+    }
+
+    public Map<UUID, UUID> getEntityAggroTargets() {
+        return entityAggroTargets;
+    }
+
 
     public void setCheckpointInventory(List<ItemStack> inv) {
         this.checkpointInventory = inv;

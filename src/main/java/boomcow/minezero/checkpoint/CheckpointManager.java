@@ -28,6 +28,8 @@ import net.minecraft.world.phys.Vec3;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.HashMap;
 
 public class CheckpointManager {
 
@@ -38,6 +40,7 @@ public class CheckpointManager {
         long startTime = System.nanoTime();
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
+
 
         // Save world data
         data.saveWorldData(level);
@@ -106,20 +109,27 @@ public class CheckpointManager {
         // Save only mobs and players
         List<CompoundTag> entityList = new ArrayList<>();
         List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
+        Map<UUID, UUID> entityAggroTargets = new HashMap<>();
         for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
             for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof Mob || entity instanceof ServerPlayer) {
+                if (entity instanceof Mob mob) {
                     CompoundTag entityNBT = new CompoundTag();
                     entity.save(entityNBT);
 
                     if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
                         entityList.add(entityNBT);
-                        entityDimensions.add(serverLevel.dimension()); // Save the dimension
+                        entityDimensions.add(serverLevel.dimension());
+
+                        // Save aggro target
+                        if (mob.getTarget() != null) {
+                            entityAggroTargets.put(mob.getUUID(), mob.getTarget().getUUID());
+                        }
                     }
                 }
             }
         }
 
+        data.setEntityAggroTargets(entityAggroTargets);
         data.setEntityDataWithDimensions(entityList, entityDimensions);
 
         // Save items on the ground
@@ -360,7 +370,8 @@ public class CheckpointManager {
 //            logger.info("Restoring entities...");
             List<CompoundTag> entities = data.getEntityData();
             List<ResourceKey<Level>> entityDimensions = data.getEntityDimensions();
-
+            Map<UUID, UUID> entityAggroTargets = data.getEntityAggroTargets();
+            Map<UUID, Mob> restoredMobs = new HashMap<>();
             for (int i = 0; i < entities.size(); i++) {
                 CompoundTag eNBT = entities.get(i);
                 ResourceKey<Level> entityDim = entityDimensions.get(i);
@@ -370,11 +381,30 @@ public class CheckpointManager {
                     EntityType.loadEntityRecursive(eNBT, targetLevel, (entity) -> {
                         if (entity != null) {
                             targetLevel.addFreshEntity(entity);
+                            if (entity instanceof Mob mob) {
+                                restoredMobs.put(mob.getUUID(), mob);
+                            }
                         }
                         return entity;
                     });
                 }
             }
+
+            // Reassign aggro targets
+            for (Map.Entry<UUID, UUID> entry : entityAggroTargets.entrySet()) {
+                UUID mobUUID = entry.getKey();
+                UUID targetUUID = entry.getValue();
+
+                if (restoredMobs.containsKey(mobUUID) && restoredMobs.containsKey(targetUUID)) {
+                    Mob mob = restoredMobs.get(mobUUID);
+                    Entity target = restoredMobs.get(targetUUID);
+
+                    if (target instanceof Mob || target instanceof ServerPlayer) {
+                        mob.setTarget((Mob) target);
+                    }
+                }
+            }
+
 
             // Restore items on the ground
             List<CompoundTag> groundItemsList = data.getGroundItems();
