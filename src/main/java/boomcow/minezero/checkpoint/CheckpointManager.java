@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +55,12 @@ public class CheckpointManager {
             pdata.yaw = player.getYRot();
             pdata.pitch = player.getXRot();
             pdata.dimension = player.level().dimension(); // Save dimension
+
+            // Using player.getDeltaMovement() which returns a Vec3
+            pdata.motionX = player.getDeltaMovement().x;
+            pdata.motionY = player.getDeltaMovement().y;
+            pdata.motionZ = player.getDeltaMovement().z;
+            pdata.fallDistance = player.fallDistance;
 
             // Store health, hunger, xp
             pdata.health = player.getHealth();
@@ -274,11 +281,13 @@ public class CheckpointManager {
                     }
 
                     // Restore health, hunger, xp, fire ticks
-
                     player.getFoodData().setFoodLevel(pdata.hunger);
                     player.setExperiencePoints(pdata.xp);
                     player.setRemainingFireTicks(pdata.fireTicks);
 //                    logger.info("remaining fire ticks: " + pdata.fireTicks);
+
+                    player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));
+                    player.fallDistance = pdata.fallDistance;
 
                     // Restore potion effects
                     player.removeAllEffects();

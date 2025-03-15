@@ -16,6 +16,10 @@ public class PlayerData {
     public double posX;
     public double posY;
     public double posZ;
+    public double motionX;
+    public double motionY;
+    public double motionZ;
+    public float fallDistance;
     public float yaw;
     public float pitch;
     public float health;
@@ -34,6 +38,10 @@ public class PlayerData {
         tag.putDouble("PosX", posX);
         tag.putDouble("PosY", posY);
         tag.putDouble("PosZ", posZ);
+        tag.putDouble("MotionX", motionX);
+        tag.putDouble("MotionY", motionY);
+        tag.putDouble("MotionZ", motionZ);
+        tag.putFloat("FallDistance", fallDistance);
         tag.putFloat("Yaw", yaw);
         tag.putFloat("Pitch", pitch);
         tag.putFloat("Health", health);
@@ -78,6 +86,10 @@ public class PlayerData {
         data.posX = tag.getDouble("PosX");
         data.posY = tag.getDouble("PosY");
         data.posZ = tag.getDouble("PosZ");
+        data.fallDistance = tag.getFloat("FallDistance");
+        data.motionX = tag.getDouble("MotionX");
+        data.motionY = tag.getDouble("MotionY");
+        data.motionZ = tag.getDouble("MotionZ");
         data.yaw = tag.getFloat("Yaw");
         data.pitch = tag.getFloat("Pitch");
         data.health = tag.getFloat("Health");
