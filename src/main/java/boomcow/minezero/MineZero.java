@@ -1,5 +1,6 @@
 package boomcow.minezero;
 
+import boomcow.minezero.command.SetSubaruPlayer;
 import boomcow.minezero.event.BlockChangeListener;
 import boomcow.minezero.event.ExplosionEventHandler;
 import com.mojang.logging.LogUtils;
@@ -28,12 +29,14 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
 import boomcow.minezero.command.SetCheckPointCommand;
+import boomcow.minezero.command.SetSubaruPlayer;
 import boomcow.minezero.event.DeathEventHandler;
 import boomcow.minezero.items.ArtifactFluteItem;
 import boomcow.minezero.ModSoundEvents;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraft.world.level.GameRules;
 
-// test commit
+
 
 @Mod(MineZero.MODID)
 public class MineZero {
@@ -78,11 +81,16 @@ public class MineZero {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         SetCheckPointCommand.register(event.getDispatcher());
+        SetSubaruPlayer.register(event.getDispatcher());
     }
+
+
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("HELLO FROM COMMON SETUP");
         LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
+        // Force the ModGameRules class to load its static fields.
+        LOGGER.info("Loading custom game rules: autoCheckpointEnabled = {}", ModGameRules.AUTO_CHECKPOINT_ENABLED);
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {

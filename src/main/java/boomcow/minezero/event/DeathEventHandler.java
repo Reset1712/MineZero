@@ -8,6 +8,7 @@ import net.minecraft.network.chat.OutgoingChatMessage;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -18,7 +19,7 @@ import boomcow.minezero.ModSoundEvents;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import boomcow.minezero.ConfigHandler; // Add this import
-
+import boomcow.minezero.event.CheckpointTicker;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -36,6 +37,10 @@ public class DeathEventHandler {
 
             ServerLevel level = player.serverLevel();
             CheckpointData data = CheckpointData.get(level);
+            MinecraftServer server = player.getServer();
+            if (server != null) {
+                CheckpointTicker.lastCheckpointTick = server.getTickCount();
+            }
 
 
 
