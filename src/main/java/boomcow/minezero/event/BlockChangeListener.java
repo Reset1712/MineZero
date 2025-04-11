@@ -49,7 +49,10 @@ public class BlockChangeListener {
                 BlockPos pos = event.getPos();
                 ServerLevel level = (ServerLevel) player.level();
                 int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
-                if (!WorldData.blockPositions.contains(pos)) {
+                if (WorldData.modifiedBlocks.contains(pos)) {
+                    WorldData.modifiedBlocks.remove(pos);
+                } else {
+                    // Otherwise, record the block break normally.
                     WorldData.minedBlocks.put(pos, state);
                     WorldData.blockDimensionIndices.put(pos, dimensionIndex);
                     logger.debug("broke block...");
