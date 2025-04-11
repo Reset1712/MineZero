@@ -1,0 +1,22 @@
+- TODO add special case for inserting ender eyes
+- TODO check if portal formed and add portal block to modified blocks
+- Track block entities again
+    - across dimensions
+    - furnace stays on after being reset
+- advanced fluid tracking
+- picking of liquid based on face
+- track non player world interactions
+    - trees
+    - crops
+    - fire
+    - gravel / sand
+    - explosions
+- double check enemy aggro
+- world particles + sounds should be canceled on death
+- save + falling shouldnt allow you to live
+- save spawn locations for non subaru people
+- armor stands, items, frames, dissapear
+- doors trapdoors not tracked
+- When you throw items on the ground in the Overworld, and then enter the Nether and die, the items will stay on the ground and in your inventory too
+- track weather
+- durability not saved (?)

@@ -11,7 +11,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -161,41 +160,14 @@ public class WorldData {
                     ChunkPos chunkPos = chunk.getPos();
                     if (!processedChunks.add(chunkPos)) continue;
 
-                    // Get all sections from the chunk.
-                    LevelChunkSection[] sections = chunk.getSections();
-                    for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-                        LevelChunkSection section = sections[sectionIndex];
-                        if (section == null) continue;
-                        // Calculate the section's base Y coordinate.
-                        int sectionBaseY = level.getMinBuildHeight() + (sectionIndex * 16);
-
-                        // Optionally, if you have access to the section's palette, you could check if the section is empty.
-                        // For example:
-                        // if (section.getPalette().size() == 1 && section.getPalette().get(0).isAir()) continue;
-
-                        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
-                        for (int localX = 0; localX < 16; localX++) {
-                            for (int localY = 0; localY < 16; localY++) {
-                                for (int localZ = 0; localZ < 16; localZ++) {
-                                    BlockState state = section.getBlockState(localX, localY, localZ);
-                                    if (!state.isAir()) {
-                                        // Convert local section coordinates to world coordinates.
-                                        int worldX = chunkPos.getMinBlockX() + localX;
-                                        int worldY = sectionBaseY + localY;
-                                        int worldZ = chunkPos.getMinBlockZ() + localZ;
-                                        mutablePos.set(worldX, worldY, worldZ);
-                                        saveBlockState(mutablePos.immutable(), state, currentDimension);
-                                    }
-                                }
-                            }
-                        }
-                    }
 
                     // Save block entities.
                     for (BlockPos entityPos : chunk.getBlockEntities().keySet()) {
                         BlockEntity blockEntity = chunk.getBlockEntity(entityPos);
                         if (blockEntity != null && !blockEntity.isRemoved()) {
-                            saveBlockEntity(entityPos, blockEntity.saveWithFullMetadata());
+                            BlockPos immutablePos = entityPos.immutable();
+                            saveBlockEntity(immutablePos, blockEntity.saveWithFullMetadata());
+                            blockDimensionIndices.put(immutablePos, getDimensionIndex(currentDimension));
                         }
                     }
                 }

@@ -29,8 +29,6 @@ import java.util.List;
 public class BlockChangeListener {
 
 
-    // TODO add special case for inserting ender eyes
-    // TODO check if portal formed and add portal block to modified blocks
     // 1. Solid block placement
     @SubscribeEvent
     public static void onSolidBlockPlace(BlockEvent.EntityPlaceEvent event) {
