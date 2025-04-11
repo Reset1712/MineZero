@@ -11,6 +11,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.storage.ServerLevelData;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -21,6 +22,11 @@ public class WorldData {
     public static final List<BlockPos> blockPositions = new ArrayList<>();
     private List<BlockState> blockStates = new ArrayList<>();
     public static final Map<BlockPos, Integer> blockDimensionIndices = new HashMap<>();
+    private boolean isRaining;
+    private boolean isThundering;
+    private int rainTime;
+    private int thunderTime;
+    private int clearTime;
 
     // Data for block entities.
     private Map<BlockPos, CompoundTag> blockEntityData;
@@ -61,6 +67,19 @@ public class WorldData {
         int newIndex = nextDimensionIndex++;
         dimensionMap.put(newIndex, dimension);
         return newIndex;
+    }
+
+    public void saveWeather(ServerLevel level) {
+        Logger logger = LogManager.getLogger();
+        this.isRaining = level.isRaining();
+        this.isThundering = level.isThundering();
+
+
+        if (level.getLevelData() instanceof ServerLevelData serverData) {
+            this.rainTime = serverData.getRainTime();
+            this.thunderTime = serverData.getThunderTime();
+            this.clearTime = serverData.getClearWeatherTime(); // Optional, for completeness
+        }
     }
 
     public static ResourceKey<Level> getDimensionFromIndex(int index) {
@@ -107,6 +126,21 @@ public class WorldData {
 
     public long getDayTime() {
         return this.dayTime;
+    }
+    public boolean isRaining() {
+        return this.isRaining;
+    }
+    public boolean isThundering() {
+        return this.isThundering;
+    }
+    public int getRainTime() {
+        return this.rainTime;
+    }
+    public int getThunderTime() {
+        return this.thunderTime;
+    }
+    public int getClearTime() {
+        return this.clearTime;
     }
 
     public List<BlockState> getBlockStates() {

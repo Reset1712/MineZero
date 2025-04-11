@@ -4,6 +4,7 @@ import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerLevel;
@@ -20,6 +21,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.PrimaryLevelData;
+import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.phys.Vec3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -177,6 +180,50 @@ public class CheckpointManager {
             }
             // Restore day time
             level.setDayTime(worldData.getDayTime());
+
+            if (level.getLevelData() instanceof ServerLevelData serverData) {
+                if (serverData instanceof PrimaryLevelData primaryData) {
+                    primaryData.setRaining(worldData.isRaining());
+                    primaryData.setThundering(worldData.isThundering());
+                }
+
+                // Always set clear weather time
+                serverData.setClearWeatherTime(worldData.getClearTime());
+
+
+                if (worldData.isRaining()) {
+                    serverData.setRainTime(worldData.getRainTime());
+                    level.setRainLevel(1.0F);
+                } else {
+                    serverData.setRainTime(0);
+                    level.setRainLevel(0);
+                }
+
+                if (worldData.isThundering()) {
+                    serverData.setThunderTime(worldData.getThunderTime());
+                    level.setThunderLevel(1.0F);
+                } else {
+                    serverData.setThunderTime(0);
+                    level.setThunderLevel(0);
+                }
+            }
+
+            for (ServerPlayer player : level.players()) {
+                player.connection.send(new ClientboundGameEventPacket(
+                        worldData.isRaining() ? ClientboundGameEventPacket.START_RAINING : ClientboundGameEventPacket.STOP_RAINING,
+                        0.0F
+                ));
+                player.connection.send(new ClientboundGameEventPacket(
+                        ClientboundGameEventPacket.RAIN_LEVEL_CHANGE,
+                        worldData.isRaining() ? 1.0F : 0.0F
+                ));
+
+                player.connection.send(new ClientboundGameEventPacket(
+                        ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE,
+                        worldData.isThundering() ? 1.0F : 0.0F
+                ));
+            }
+
 
             // Restore only modified blocks to air in the correct dimensions
             for (BlockPos pos : WorldData.modifiedBlocks) {
