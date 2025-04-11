@@ -1,6 +1,5 @@
 package boomcow.minezero.checkpoint;
 
-import boomcow.minezero.ModSoundEvents;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
@@ -9,7 +8,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -17,19 +15,16 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.HashMap;
+import java.util.*;
 
 public class CheckpointManager {
 
@@ -58,6 +53,8 @@ public class CheckpointManager {
             pdata.yaw = player.getYRot();
             pdata.pitch = player.getXRot();
             pdata.dimension = player.level().dimension(); // Save dimension
+            GameType type = player.gameMode.getGameModeForPlayer();
+            pdata.gameMode = type.getName().toLowerCase(Locale.ROOT);
 
             // Using player.getDeltaMovement() which returns a Vec3
             pdata.motionX = player.getDeltaMovement().x;
@@ -197,8 +194,17 @@ public class CheckpointManager {
             }
 
             // Restore modified fluid blocks to air in the correct dimensions
+
             for (BlockPos pos : WorldData.modifiedFluidBlocks) {
+
+
+                if (!WorldData.blockDimensionIndices.containsKey(pos)) {
+                    logger.info("No dimension index for modified fluid block at " + pos);
+                    continue;
+                }
+
                 logger.debug("Restoring fluid block at " + pos);
+                logger.info("Restoring fluid block at " + pos);
                 int dimIndex = WorldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
@@ -214,6 +220,12 @@ public class CheckpointManager {
             for (Map.Entry<BlockPos, BlockState> entry : WorldData.minedFluidBlocks.entrySet()) {
                 BlockPos pos = entry.getKey();
                 BlockState originalState = entry.getValue();
+
+                if (!WorldData.blockDimensionIndices.containsKey(pos)) {
+                    logger.info("No dimension index for modified fluid block at " + pos);
+                    continue;
+                }
+
                 int dimIndex = WorldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
@@ -294,6 +306,14 @@ public class CheckpointManager {
                     player.getFoodData().setFoodLevel(pdata.hunger);
                     player.setExperiencePoints(pdata.xp);
                     player.setRemainingFireTicks(pdata.fireTicks);
+                    if (pdata.gameMode != null) {
+                        switch (pdata.gameMode.toLowerCase()) {
+                            case "survival" -> player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                            case "creative" -> player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
+                            case "adventure" -> player.setGameMode(net.minecraft.world.level.GameType.ADVENTURE);
+                            case "spectator" -> player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
+                        }
+                    }
 //                    logger.info("remaining fire ticks: " + pdata.fireTicks);
 
                     player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));

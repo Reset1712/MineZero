@@ -28,6 +28,7 @@ public class PlayerData {
     public int fireTicks;
     public ResourceKey<Level> dimension;
     public List<ItemStack> inventory = new ArrayList<>();
+    public String gameMode;
 
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
     // New field for advancements.
@@ -48,6 +49,7 @@ public class PlayerData {
         tag.putInt("Hunger", hunger);
         tag.putInt("XP", xp);
         tag.putInt("FireTicks", fireTicks);
+        tag.putString("GameMode", gameMode);
 
         // Save potion effects
         ListTag effectsTag = new ListTag();
@@ -116,6 +118,10 @@ public class PlayerData {
         // Load dimension
         if (tag.contains("Dimension")) {
             data.dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("Dimension")));
+        }
+
+        if (tag.contains("GameMode")) {
+            data.gameMode = tag.getString("GameMode");
         }
 
         CompoundTag invTag = tag.getCompound("Inventory");
