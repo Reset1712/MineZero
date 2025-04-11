@@ -68,6 +68,19 @@ public class CheckpointManager {
             pdata.xp = player.experienceLevel; // or setExperiencePoints if needed
             pdata.fireTicks = player.getRemainingFireTicks();
 
+            BlockPos spawn = player.getRespawnPosition();
+            ResourceKey<Level> spawnDim = player.getRespawnDimension();
+            boolean forced = player.isRespawnForced();
+
+            if (spawn != null && spawnDim != null) {
+                pdata.spawnX = spawn.getX() + 0.5;
+                pdata.spawnY = spawn.getY();
+                pdata.spawnZ = spawn.getZ() + 0.5;
+                pdata.spawnDimension = spawnDim;
+                pdata.spawnForced = forced;
+            }
+
+
             // Store potion effects
             pdata.potionEffects.clear();
             for (MobEffectInstance effect : player.getActiveEffects()) {
@@ -315,6 +328,18 @@ public class CheckpointManager {
                         }
                     }
 //                    logger.info("remaining fire ticks: " + pdata.fireTicks);
+
+                    if (pdata.spawnDimension != null) {
+                        player.setRespawnPosition(
+                                pdata.spawnDimension,
+                                new BlockPos((int)pdata.spawnX, (int)pdata.spawnY, (int)pdata.spawnZ),
+                                pdata.yaw,     // or a fixed value like 0.0f
+                                true,
+                                false          // update client
+                        );
+                    }
+
+
 
                     player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));
                     player.fallDistance = pdata.fallDistance;

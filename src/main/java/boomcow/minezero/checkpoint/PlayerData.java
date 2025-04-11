@@ -29,6 +29,11 @@ public class PlayerData {
     public ResourceKey<Level> dimension;
     public List<ItemStack> inventory = new ArrayList<>();
     public String gameMode;
+    public double spawnX;
+    public double spawnY;
+    public double spawnZ;
+    public ResourceKey<Level> spawnDimension;
+    public boolean spawnForced;
 
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
     // New field for advancements.
@@ -50,6 +55,15 @@ public class PlayerData {
         tag.putInt("XP", xp);
         tag.putInt("FireTicks", fireTicks);
         tag.putString("GameMode", gameMode);
+
+        tag.putDouble("SpawnX", spawnX);
+        tag.putDouble("SpawnY", spawnY);
+        tag.putDouble("SpawnZ", spawnZ);
+        tag.putBoolean("SpawnForced", spawnForced);
+
+        if (spawnDimension != null) {
+            tag.putString("SpawnDimension", spawnDimension.location().toString());
+        }
 
         // Save potion effects
         ListTag effectsTag = new ListTag();
@@ -98,6 +112,15 @@ public class PlayerData {
         data.hunger = tag.getInt("Hunger");
         data.xp = tag.getInt("XP");
         data.fireTicks = tag.getInt("FireTicks");
+
+        data.spawnX = tag.getDouble("SpawnX");
+        data.spawnY = tag.getDouble("SpawnY");
+        data.spawnZ = tag.getDouble("SpawnZ");
+        data.spawnForced = tag.getBoolean("SpawnForced");
+
+        if (tag.contains("SpawnDimension")) {
+            data.spawnDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("SpawnDimension")));
+        }
 
         // Load potion effects
         data.potionEffects.clear();
