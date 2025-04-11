@@ -31,6 +31,24 @@ minecraft {
             }
         }
 
+        clientAlt {
+            taskName 'runClientAlt'
+            workingDirectory project.file('runAlt')
+            parent runs.client
+            args '--username', 'MrBean'
+            ideaModule "${project.name}.main"
+            client true
+            inheritArgs true
+            inheritJvmArgs true
+            mods {
+                minezero {
+                    source sourceSets.main
+                }
+            }
+
+            property 'allowMultipleInstances', 'true'
+        }
+
         server {
             workingDirectory project.file('run')
 
