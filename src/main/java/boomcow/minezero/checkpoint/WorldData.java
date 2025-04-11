@@ -49,6 +49,9 @@ public class WorldData {
 
 
     private long dayTime;
+    private long gameTime;
+
+
 
     public WorldData() {
         this.blockEntityData = new HashMap<>();
@@ -127,6 +130,15 @@ public class WorldData {
     public long getDayTime() {
         return this.dayTime;
     }
+
+    public long getGameTime() {
+        return this.gameTime;
+    }
+
+    public void saveGameTime(long gameTime) {
+        this.gameTime = gameTime;
+    }
+
     public boolean isRaining() {
         return this.isRaining;
     }
@@ -151,6 +163,55 @@ public class WorldData {
         return blockPositions;
     }
 
+    public static class LightningStrike {
+        public final BlockPos pos;
+        public final long tickTime;
+
+        public LightningStrike(BlockPos pos, long tickTime) {
+            this.pos = pos;
+            this.tickTime = tickTime;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            LightningStrike that = (LightningStrike) o;
+            return tickTime == that.tickTime && pos.equals(that.pos);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(pos, tickTime);
+        }
+    }
+
+    private final List<LightningStrike> savedLightnings = new ArrayList<>();
+
+    public void addLightningStrike(BlockPos pos, long tickTime) {
+        Logger logger = LogManager.getLogger();
+        LightningStrike newStrike = new LightningStrike(pos, tickTime);
+
+        if (!savedLightnings.contains(newStrike)) {
+            savedLightnings.add(newStrike);
+        }
+    }
+
+
+    public List<LightningStrike> getSavedLightnings() {
+        return savedLightnings;
+    }
+
+
+
+
+
+
+
+
+
+
+
     /**
      * Clears all saved world data.
      */
@@ -165,6 +226,14 @@ public class WorldData {
         blockEntityData.clear();
         blockDimensionIndices.clear();
         savedBlocksByChunk.clear();
+        savedLightnings.clear();
+        rainTime = 0;
+        thunderTime = 0;
+        clearTime = 0;
+        isRaining = false;
+        isThundering = false;
+        dayTime = 0;
+        gameTime = 0;
     }
 
     /**

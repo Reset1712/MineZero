@@ -90,6 +90,7 @@ public class CheckpointData extends SavedData {
         this.worldData.saveAllLoadedChunks(level);
         this.worldData.saveWeather(level);
         this.worldData.saveDayTime(level.getDayTime());
+        this.worldData.saveGameTime(level.getGameTime());
         this.setDirty();
     }
 

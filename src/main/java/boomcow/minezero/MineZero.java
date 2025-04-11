@@ -1,8 +1,9 @@
 package boomcow.minezero;
 
+import boomcow.minezero.command.SetCheckPointCommand;
 import boomcow.minezero.command.SetSubaruPlayer;
-import boomcow.minezero.event.BlockChangeListener;
-import boomcow.minezero.event.ExplosionEventHandler;
+import boomcow.minezero.event.DeathEventHandler;
+import boomcow.minezero.items.ArtifactFluteItem;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.BlockItem;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -28,13 +30,6 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
-import boomcow.minezero.command.SetCheckPointCommand;
-import boomcow.minezero.command.SetSubaruPlayer;
-import boomcow.minezero.event.DeathEventHandler;
-import boomcow.minezero.items.ArtifactFluteItem;
-import boomcow.minezero.ModSoundEvents;
-import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
-import net.minecraft.world.level.GameRules;
 
 
 
@@ -72,7 +67,7 @@ public class MineZero {
         // Register event handlers
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new DeathEventHandler());
-        MinecraftForge.EVENT_BUS.register(new BlockChangeListener());
+
 
         ModSoundEvents.register(FMLJavaModLoadingContext.get().getModEventBus());
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ConfigHandler.COMMON_CONFIG);

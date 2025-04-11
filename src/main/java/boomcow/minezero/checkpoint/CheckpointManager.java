@@ -1,5 +1,6 @@
 package boomcow.minezero.checkpoint;
 
+import boomcow.minezero.util.LightningScheduler;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
@@ -165,21 +166,26 @@ public class CheckpointManager {
     public static void restoreCheckpoint(ServerPlayer anchorPlayer) {
         Logger logger = LogManager.getLogger();
         logger.debug("Restoring checkpoint...");
-        logger.debug(" ");
+
         long startTime = System.nanoTime();
         try {
             ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
             WorldData worldData = data.getWorldData();
-            // logger.info("checkpoint health" + data.getCheckpointHealth());
 
-//            logger.info("anchor health" + data.getPlayerData(data.getAnchorPlayerUUID()).health);
             if (data.getPlayerData(data.getAnchorPlayerUUID()) == null) {
                 logger.error("Player data is null!");
                 return;
             }
             // Restore day time
             level.setDayTime(worldData.getDayTime());
+
+            if (level.getLevelData() instanceof ServerLevelData serverData) {
+                serverData.setGameTime(worldData.getGameTime());
+                if (serverData instanceof PrimaryLevelData primaryData) {
+                    primaryData.setGameTime(worldData.getGameTime());
+                }
+            }
 
             if (level.getLevelData() instanceof ServerLevelData serverData) {
                 if (serverData instanceof PrimaryLevelData primaryData) {
@@ -264,7 +270,7 @@ public class CheckpointManager {
                 }
 
                 logger.debug("Restoring fluid block at " + pos);
-                logger.info("Restoring fluid block at " + pos);
+
                 int dimIndex = WorldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
@@ -374,7 +380,7 @@ public class CheckpointManager {
                             case "spectator" -> player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
                         }
                     }
-//                    logger.info("remaining fire ticks: " + pdata.fireTicks);
+
 
                     if (pdata.spawnDimension != null) {
                         player.setRespawnPosition(
@@ -448,18 +454,16 @@ public class CheckpointManager {
                         entitiesToRemove.add(entity);
                     }
                 }
-
                 // Remove collected entities in this dimension
                 for (Entity entity : entitiesToRemove) {
                     entity.discard(); // Safely discard the entity
                 }
-
                 // Clear the list for the next dimension
                 entitiesToRemove.clear();
             }
 
             // Restore mobs and players from checkpoint data
-//            logger.info("Restoring entities...");
+
             List<CompoundTag> entities = data.getEntityData();
             List<ResourceKey<Level>> entityDimensions = data.getEntityDimensions();
             Map<UUID, UUID> entityAggroTargets = data.getEntityAggroTargets();
@@ -510,10 +514,23 @@ public class CheckpointManager {
                     });
                 }
             }
+
+            List<WorldData.LightningStrike> strikes = worldData.getSavedLightnings();
+            for (WorldData.LightningStrike strike : strikes) {
+
+                long delay = strike.tickTime - level.getGameTime(); // adjust if needed
+                if (delay < 0) delay = 1;
+
+                LightningScheduler.schedule(level, strike.pos, strike.tickTime);
+
+            }
+
+
+
             long endTime = System.nanoTime();
             long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
             logger.debug("Restoring states took {} ms", durationMs);
-            logger.info("Checkpoint restored");
+
 
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
