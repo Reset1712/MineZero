@@ -11,10 +11,18 @@ import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.decoration.HangingEntity;
+import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.projectile.EvokerFangs;
+import net.minecraft.world.entity.projectile.EyeOfEnder;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.vehicle.AbstractMinecart;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
@@ -25,6 +33,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.entity.PartEntity;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -141,6 +150,39 @@ public class CheckpointManager {
                         if (mob.getTarget() != null) {
                             entityAggroTargets.put(mob.getUUID(), mob.getTarget().getUUID());
                         }
+                    }
+                }
+            }
+        }
+
+        // Save other non-mob entities like projectiles, items, boats, etc.
+        for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
+            for (Entity entity : serverLevel.getAllEntities()) {
+                if (entity instanceof Mob) continue; // Already handled above
+
+                if (entity instanceof AbstractMinecart ||
+                        entity instanceof AreaEffectCloud ||
+                        entity instanceof Boat ||
+                        entity instanceof EndCrystal ||
+                        entity instanceof EvokerFangs ||
+                        entity instanceof ExperienceOrb ||
+                        entity instanceof EyeOfEnder ||
+                        entity instanceof FallingBlockEntity ||
+                        entity instanceof HangingEntity ||
+                        entity instanceof ItemEntity ||
+                        entity instanceof LightningBolt ||
+                        entity instanceof Marker ||
+                        entity instanceof PartEntity ||
+                        entity instanceof PrimedTnt ||
+                        entity instanceof Projectile ||
+                        entity instanceof ArmorStand) {
+
+                    CompoundTag entityNBT = new CompoundTag();
+                    entity.save(entityNBT);
+
+                    if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
+                        entityList.add(entityNBT);
+                        entityDimensions.add(serverLevel.dimension());
                     }
                 }
             }
