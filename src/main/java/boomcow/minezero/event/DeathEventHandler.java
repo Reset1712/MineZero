@@ -40,8 +40,10 @@ public class DeathEventHandler {
                 return; // Do nothing if the player is not the anchor player
             }
 
-
-            CheckpointManager.restoreCheckpoint(player);
+            event.setCanceled(true);
+            level.getServer().execute(() -> {
+                CheckpointManager.restoreCheckpoint(player);
+            });
 
             // Notify all players
             level.getServer().getPlayerList().getPlayers().forEach(p -> {
@@ -55,7 +57,8 @@ public class DeathEventHandler {
             });
 
             // Cancel the death of the anchor player
-            event.setCanceled(true);
+
+
 
             // Play a chime sound
             String chime = ConfigHandler.getDeathChime();

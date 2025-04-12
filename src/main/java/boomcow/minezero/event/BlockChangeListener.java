@@ -119,22 +119,19 @@ public class BlockChangeListener {
             ServerLevel level = (ServerLevel) event.getLevel();
             int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
 
-            logger.info(bucketItem.getFluid());
             // Check if the bucket contains a fluid (for placement)
             if (bucketItem.getFluid() == Fluids.LAVA || bucketItem.getFluid() == Fluids.WATER) {
                 // Fluid will be placed at the adjacent block in the direction of the clicked face.
                 BlockPos targetPos = event.getPos().relative(event.getFace());
                 WorldData.modifiedFluidBlocks.add(targetPos);
                 WorldData.blockDimensionIndices.put(targetPos, dimensionIndex);
-                logger.info("Placing fluid at {} in dimension index {}", targetPos, dimensionIndex);
             }
             // Otherwise, if the bucket is empty, check if we are picking up a fluid.
             else if (bucketItem.getFluid() == Fluids.EMPTY) {
                 // For fluid pickup, check the clicked block.
-                logger.info("picking up fluid");
+
                 BlockPos targetPos = event.getPos().relative(event.getFace());
                 BlockState state = level.getBlockState(targetPos);
-                logger.info(state.getFluidState());
                 // Check if the fluid state of the block is either water or lava.
                 if (state.getFluidState().is(Fluids.WATER) || state.getFluidState().is(Fluids.LAVA)) {
                     if (WorldData.modifiedFluidBlocks.contains(targetPos)) {
@@ -143,7 +140,6 @@ public class BlockChangeListener {
                         // Record this fluid pickup as a mined fluid block.
                         WorldData.minedFluidBlocks.put(targetPos, state);
                         WorldData.blockDimensionIndices.put(targetPos, dimensionIndex);
-                        logger.info("Picked up fluid at {} in dimension index {}", targetPos, dimensionIndex);
                     }
                 }
             }

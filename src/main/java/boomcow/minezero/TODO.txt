@@ -13,14 +13,16 @@ X Track block entities again
         - spread fires
         - fire block breaks
     - gravel / sand
-    - explosions
+    X explosions
 - double check enemy aggro
 - world particles + sounds should be canceled on death
 - save + falling shouldnt allow you to live
 X save spawn locations for non subaru people
 - armor stands, items, frames, dissapear
 - doors trapdoors not tracked
+X xp glitch
 - When you throw items on the ground in the Overworld, and then enter the Nether and die, the items will stay on the ground and in your inventory too
 X track weather
     X track lighting
 - durability not saved (?)
+X fixed fire tick double death bug
