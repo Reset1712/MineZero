@@ -28,6 +28,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.EndPortalFrameBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.PrimaryLevelData;
@@ -564,6 +565,54 @@ public class CheckpointManager {
                     });
                 }
             }
+
+            for (BlockPos eyePos : WorldData.addedEyes) {
+                BlockState state = level.getBlockState(eyePos);
+                if (state.getBlock() == Blocks.END_PORTAL_FRAME && state.getValue(EndPortalFrameBlock.HAS_EYE)) {
+                    level.setBlock(eyePos, state.setValue(EndPortalFrameBlock.HAS_EYE, false), 3);
+                }
+            }
+
+
+
+
+
+            for (BlockPos originalPos : new ArrayList<>(WorldData.destroyedPortals.keySet())) {
+                int dimIndex = WorldData.blockDimensionIndices.get(originalPos);
+                ResourceKey<Level> dimension = WorldData.getDimensionFromIndex(dimIndex);
+                ServerLevel dim = level.getServer().getLevel(dimension);
+
+                if (dim != null) {
+                    BlockPos pos = originalPos;
+
+                    // Go downward until we find a solid block (usually the obsidian base)
+                    while (dim.getBlockState(pos.below()).isAir() && pos.getY() > dim.getMinBuildHeight()) {
+                        pos = pos.below();
+                    }
+
+                    BlockState below = dim.getBlockState(pos.below());
+                    BlockState current = dim.getBlockState(pos);
+
+                    if (current.isAir() && below.getBlock() == Blocks.OBSIDIAN) {
+                        // Place fire to trigger portal re-lighting
+                        dim.setBlockAndUpdate(pos, Blocks.FIRE.defaultBlockState());
+                    }
+                }
+            }
+            WorldData.destroyedPortals.clear();
+
+            for (BlockPos pos : WorldData.createdPortals) {
+                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                ResourceKey<Level> dimension = WorldData.getDimensionFromIndex(dimIndex);
+                ServerLevel dim = level.getServer().getLevel(dimension);
+                if (dim != null) {
+                    BlockState currentState = dim.getBlockState(pos);
+                    if (currentState.getBlock() == Blocks.NETHER_PORTAL) {
+                        dim.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+                    }
+                }
+            }
+            WorldData.createdPortals.clear();
 
             List<WorldData.LightningStrike> strikes = worldData.getSavedLightnings();
             for (WorldData.LightningStrike strike : strikes) {

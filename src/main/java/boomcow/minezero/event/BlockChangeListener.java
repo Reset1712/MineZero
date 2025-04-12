@@ -7,10 +7,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.BedBlock;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
@@ -33,15 +30,25 @@ public class BlockChangeListener {
     @SubscribeEvent
     public static void onSolidBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            BlockState state = event.getState();
-            // Only handle non-fluid placements.
-            if (!(state.getBlock() instanceof LiquidBlock)) {
-                BlockPos pos = event.getPos();
-                ServerLevel level = (ServerLevel) player.level();
-                int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
-                WorldData.modifiedBlocks.add(pos);
-                WorldData.blockDimensionIndices.put(pos, dimensionIndex);
+            BlockState newState = event.getState();
+            Logger logger = LogManager.getLogger();
+            BlockPos pos = event.getPos();
+            ServerLevel level = (ServerLevel) player.level();
+            int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
+
+            // Skip liquid placements
+            if (newState.getBlock() instanceof LiquidBlock) return;
+
+            // Special case: Eye added to End Portal Frame
+            if (newState.getBlock() == Blocks.END_PORTAL_FRAME && newState.getValue(EndPortalFrameBlock.HAS_EYE)) {
+                WorldData.addedEyes.add(pos);
+                return;
             }
+
+            // Regular block placement
+            logger.info("Block placed at: " + pos);
+            WorldData.modifiedBlocks.add(pos);
+            WorldData.blockDimensionIndices.put(pos, dimensionIndex);
         }
     }
 
@@ -98,6 +105,19 @@ public class BlockChangeListener {
                         BlockState currentState = level.getBlockState(currentPos);
                         WorldData.minedBlocks.put(currentPos, currentState);
                         WorldData.blockDimensionIndices.put(currentPos, dimensionIndex);
+                    }
+
+                    BlockState brokenState = level.getBlockState(currentPos);
+                    if (brokenState.getBlock() == Blocks.OBSIDIAN) {
+                        for (Direction dir : Direction.values()) {
+                            BlockPos neighbor = currentPos.relative(dir);
+                            BlockState neighborState = level.getBlockState(neighbor);
+                            if (neighborState.getBlock() == Blocks.NETHER_PORTAL) {
+                                WorldData.destroyedPortals.put(neighbor.immutable(), neighborState);
+                                WorldData.blockDimensionIndices.put(neighbor.immutable(), dimensionIndex);
+                                WorldData.createdPortals.remove(neighbor.immutable());
+                            }
+                        }
                     }
                 }
             }

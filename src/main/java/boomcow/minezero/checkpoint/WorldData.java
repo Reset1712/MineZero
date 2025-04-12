@@ -43,9 +43,12 @@ public class WorldData {
 
     public static final Set<BlockPos> modifiedBlocks = new HashSet<>();
     public static final Map<BlockPos, BlockState> minedBlocks = new HashMap<>();
-
+    public static final Set<BlockPos> addedEyes = new HashSet<>();
     public static final Set<BlockPos> modifiedFluidBlocks = new HashSet<>();
     public static final Map<BlockPos, BlockState> minedFluidBlocks = new HashMap<>();
+    public static final Set<BlockPos> createdPortals = new HashSet<>();
+    public static final Map<BlockPos, BlockState> destroyedPortals = new HashMap<>();
+
 
     public static List<BlockPos> newFires = new ArrayList<>();
     private long checkpointTick;
@@ -251,6 +254,8 @@ public class WorldData {
         gameTime = 0;
         checkpointTick = 0;
         newFires.clear();
+        createdPortals.clear();
+        destroyedPortals.clear();
     }
 
     /**
