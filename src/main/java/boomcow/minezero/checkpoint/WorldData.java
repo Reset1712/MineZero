@@ -47,6 +47,21 @@ public class WorldData {
     public static final Set<BlockPos> modifiedFluidBlocks = new HashSet<>();
     public static final Map<BlockPos, BlockState> minedFluidBlocks = new HashMap<>();
 
+    public static List<BlockPos> newFires = new ArrayList<>();
+    private long checkpointTick;
+
+    public List<BlockPos> getNewFires() {
+        return newFires;
+    }
+
+
+    public void saveCheckpointTick(long checkpointTick) {
+        this.checkpointTick = checkpointTick;
+    }
+
+    public long getCheckpointTick() {
+        return this.checkpointTick;
+    }
 
     private long dayTime;
     private long gameTime;
@@ -234,6 +249,8 @@ public class WorldData {
         isThundering = false;
         dayTime = 0;
         gameTime = 0;
+        checkpointTick = 0;
+        newFires.clear();
     }
 
     /**

@@ -1,30 +1,20 @@
 package boomcow.minezero.event;
 
+import boomcow.minezero.ConfigHandler;
+import boomcow.minezero.ModSoundEvents;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
-import boomcow.minezero.checkpoint.PlayerData;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.OutgoingChatMessage;
-import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraft.sounds.SoundSource;
-import boomcow.minezero.ModSoundEvents;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import boomcow.minezero.ConfigHandler; // Add this import
-import boomcow.minezero.event.CheckpointTicker;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 
 public class DeathEventHandler {
 
@@ -51,7 +41,6 @@ public class DeathEventHandler {
             }
 
 
-            // Reset the world when the anchor player dies
             CheckpointManager.restoreCheckpoint(player);
 
             // Notify all players

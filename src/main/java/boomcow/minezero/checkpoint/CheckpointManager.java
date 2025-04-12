@@ -69,7 +69,10 @@ public class CheckpointManager {
             // Store health, hunger, xp
             pdata.health = player.getHealth();
             pdata.hunger = player.getFoodData().getFoodLevel();
-            pdata.xp = player.experienceLevel; // or setExperiencePoints if needed
+            pdata.experienceLevel = player.experienceLevel;
+            pdata.experienceProgress = player.experienceProgress;
+
+            logger.info("Player XP: " + player.totalExperience);
             pdata.fireTicks = player.getRemainingFireTicks();
 
             BlockPos spawn = player.getRespawnPosition();
@@ -259,6 +262,8 @@ public class CheckpointManager {
                 }
             }
 
+
+
             // Restore modified fluid blocks to air in the correct dimensions
 
             for (BlockPos pos : WorldData.modifiedFluidBlocks) {
@@ -370,7 +375,10 @@ public class CheckpointManager {
 
                     // Restore health, hunger, xp, fire ticks
                     player.getFoodData().setFoodLevel(pdata.hunger);
-                    player.setExperiencePoints(pdata.xp);
+                    player.setExperienceLevels(pdata.experienceLevel);
+                    player.experienceProgress = pdata.experienceProgress;  // direct field access
+
+
                     player.setRemainingFireTicks(pdata.fireTicks);
                     if (pdata.gameMode != null) {
                         switch (pdata.gameMode.toLowerCase()) {
@@ -524,6 +532,15 @@ public class CheckpointManager {
                 LightningScheduler.schedule(level, strike.pos, strike.tickTime);
 
             }
+
+            // 1. Remove new fire blocks
+            for (BlockPos firePos : worldData.getNewFires()) {
+                if (level.getBlockState(firePos).getBlock() == Blocks.FIRE) {
+                    level.setBlockAndUpdate(firePos, Blocks.AIR.defaultBlockState());
+                }
+            }
+
+            // 2. Restore blocks destroyed by fire
 
 
 

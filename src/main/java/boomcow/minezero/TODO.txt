@@ -9,6 +9,9 @@ X Track block entities again
     - trees
     - crops
     - fire
+        X placed fires
+        - spread fires
+        - fire block breaks
     - gravel / sand
     - explosions
 - double check enemy aggro
@@ -19,5 +22,5 @@ X save spawn locations for non subaru people
 - doors trapdoors not tracked
 - When you throw items on the ground in the Overworld, and then enter the Nether and die, the items will stay on the ground and in your inventory too
 X track weather
-    - track lighting
+    X track lighting
 - durability not saved (?)

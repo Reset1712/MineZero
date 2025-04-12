@@ -98,7 +98,6 @@ public class BlockChangeListener {
                         BlockState currentState = level.getBlockState(currentPos);
                         WorldData.minedBlocks.put(currentPos, currentState);
                         WorldData.blockDimensionIndices.put(currentPos, dimensionIndex);
-                        logger.debug("Broke block at {}.", currentPos);
                     }
                 }
             }

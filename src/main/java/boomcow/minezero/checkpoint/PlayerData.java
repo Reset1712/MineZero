@@ -24,7 +24,8 @@ public class PlayerData {
     public float pitch;
     public float health;
     public int hunger;
-    public int xp;
+    public int experienceLevel;
+    public float experienceProgress;
     public int fireTicks;
     public ResourceKey<Level> dimension;
     public List<ItemStack> inventory = new ArrayList<>();
@@ -52,9 +53,11 @@ public class PlayerData {
         tag.putFloat("Pitch", pitch);
         tag.putFloat("Health", health);
         tag.putInt("Hunger", hunger);
-        tag.putInt("XP", xp);
+
         tag.putInt("FireTicks", fireTicks);
         tag.putString("GameMode", gameMode);
+        tag.putInt("ExperienceLevel", experienceLevel);
+        tag.putFloat("ExperienceProgress", experienceProgress);
 
         tag.putDouble("SpawnX", spawnX);
         tag.putDouble("SpawnY", spawnY);
@@ -110,13 +113,16 @@ public class PlayerData {
         data.pitch = tag.getFloat("Pitch");
         data.health = tag.getFloat("Health");
         data.hunger = tag.getInt("Hunger");
-        data.xp = tag.getInt("XP");
         data.fireTicks = tag.getInt("FireTicks");
 
         data.spawnX = tag.getDouble("SpawnX");
         data.spawnY = tag.getDouble("SpawnY");
         data.spawnZ = tag.getDouble("SpawnZ");
         data.spawnForced = tag.getBoolean("SpawnForced");
+
+        data.experienceLevel = tag.getInt("ExperienceLevel");
+        data.experienceProgress = tag.getFloat("ExperienceProgress");
+
 
         if (tag.contains("SpawnDimension")) {
             data.spawnDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("SpawnDimension")));

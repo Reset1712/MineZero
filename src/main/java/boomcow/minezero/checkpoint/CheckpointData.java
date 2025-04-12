@@ -91,6 +91,7 @@ public class CheckpointData extends SavedData {
         this.worldData.saveWeather(level);
         this.worldData.saveDayTime(level.getDayTime());
         this.worldData.saveGameTime(level.getGameTime());
+        this.worldData.saveCheckpointTick(level.getGameTime());
         this.setDirty();
     }
 
