@@ -22,6 +22,9 @@
   "gamerule.fluteCooldownDuration": "Flute Cooldown Duration",
   "gamerule.fluteCooldownDuration.description": "Duration in seconds for the Artifact Flute cooldown.",
 
+  "gamerule.artifactFluteEnabled": "Artifact Flute Enabled",
+  "gamerule.artifactFluteEnabled.description": "Enable or disable the Artifact Flute feature.",
+
   "_comment": "Keybinds",
   "key.categories.minezero": "MineZero Keybinds",
   "key.minezero.example_action": "Example Action",
