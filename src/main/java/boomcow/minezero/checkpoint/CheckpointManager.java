@@ -2,8 +2,10 @@ package boomcow.minezero.checkpoint;
 
 import boomcow.minezero.util.LightningScheduler;
 import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.resources.ResourceKey;
@@ -23,7 +25,6 @@ import net.minecraft.world.entity.projectile.EyeOfEnder;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.Boat;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -34,7 +35,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.entity.PartEntity;
+import net.neoforged.neoforge.entity.PartEntity;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -49,7 +50,7 @@ public class CheckpointManager {
         long startTime = System.nanoTime();
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
-
+        HolderLookup.Provider lookupProvider = level.registryAccess();
 
         // Save world data
         data.saveWorldData(level);
@@ -59,75 +60,69 @@ public class CheckpointManager {
 
         // Capture all currently online players' data
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            PlayerData pdata = new PlayerData();
+            PlayerData pdataObject = new PlayerData(); // Create the live PlayerData object
             // Store player position
-            pdata.posX = player.getX();
-            pdata.posY = player.getY();
-            pdata.posZ = player.getZ();
-            pdata.yaw = player.getYRot();
-            pdata.pitch = player.getXRot();
-            pdata.dimension = player.level().dimension(); // Save dimension
+            pdataObject.posX = player.getX();
+            pdataObject.posY = player.getY();
+            pdataObject.posZ = player.getZ();
+            pdataObject.yaw = player.getYRot();
+            pdataObject.pitch = player.getXRot();
+            pdataObject.dimension = player.level().dimension();
             GameType type = player.gameMode.getGameModeForPlayer();
-            pdata.gameMode = type.getName().toLowerCase(Locale.ROOT);
+            pdataObject.gameMode = type.getName().toLowerCase(Locale.ROOT);
 
-            // Using player.getDeltaMovement() which returns a Vec3
-            pdata.motionX = player.getDeltaMovement().x;
-            pdata.motionY = player.getDeltaMovement().y;
-            pdata.motionZ = player.getDeltaMovement().z;
-            pdata.fallDistance = player.fallDistance;
+            pdataObject.motionX = player.getDeltaMovement().x;
+            pdataObject.motionY = player.getDeltaMovement().y;
+            pdataObject.motionZ = player.getDeltaMovement().z;
+            pdataObject.fallDistance = player.fallDistance;
 
-            // Store health, hunger, xp
-            pdata.health = player.getHealth();
-            pdata.hunger = player.getFoodData().getFoodLevel();
-            pdata.experienceLevel = player.experienceLevel;
-            pdata.experienceProgress = player.experienceProgress;
-
-            logger.info("Player XP: " + player.totalExperience);
-            pdata.fireTicks = player.getRemainingFireTicks();
+            pdataObject.health = player.getHealth();
+            pdataObject.hunger = player.getFoodData().getFoodLevel();
+            pdataObject.experienceLevel = player.experienceLevel;
+            pdataObject.experienceProgress = player.experienceProgress;
+            pdataObject.fireTicks = player.getRemainingFireTicks();
 
             BlockPos spawn = player.getRespawnPosition();
             ResourceKey<Level> spawnDim = player.getRespawnDimension();
-            boolean forced = player.isRespawnForced();
-
             if (spawn != null && spawnDim != null) {
-                pdata.spawnX = spawn.getX() + 0.5;
-                pdata.spawnY = spawn.getY();
-                pdata.spawnZ = spawn.getZ() + 0.5;
-                pdata.spawnDimension = spawnDim;
-                pdata.spawnForced = forced;
+                pdataObject.spawnX = spawn.getX() + 0.5;
+                pdataObject.spawnY = spawn.getY();
+                pdataObject.spawnZ = spawn.getZ() + 0.5;
+                pdataObject.spawnDimension = spawnDim;
+                pdataObject.spawnForced = player.isRespawnForced();
             }
 
-
-            // Store potion effects
-            pdata.potionEffects.clear();
+            pdataObject.potionEffects.clear();
             for (MobEffectInstance effect : player.getActiveEffects()) {
-                pdata.potionEffects.add(new MobEffectInstance(effect));
+                pdataObject.potionEffects.add(new MobEffectInstance(effect)); // Copy constructor is fine
             }
 
-            // Store inventory
-            pdata.inventory.clear();
+            pdataObject.inventory.clear();
             for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-                ItemStack stack = player.getInventory().getItem(i).copy();
-                pdata.inventory.add(stack);
+                pdataObject.inventory.add(player.getInventory().getItem(i).copy());
             }
 
-            CompoundTag advTag = new CompoundTag();
-            for (Advancement advancement : player.server.getAdvancements().getAllAdvancements()) {
-                AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
-                // Create a tag to hold progress details.
-                CompoundTag progressTag = new CompoundTag();
-
-                // For each criterion, check if it's done.
-                for (String criterion : progress.getCompletedCriteria()) {
-                    progressTag.putBoolean(criterion, true);
+            CompoundTag capturedAdvancementsNBT = new CompoundTag();
+            if (player.server != null) {
+                for (AdvancementHolder advancementHolder : player.server.getAdvancements().getAllAdvancements()) {
+                    AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancementHolder);
+                    CompoundTag individualAdvancementProgressTag = new CompoundTag();
+                    if (progress != null) {
+                        for (String criterionName : progress.getCompletedCriteria()) {
+                            individualAdvancementProgressTag.putBoolean(criterionName, true);
+                        }
+                    }
+                    if (!individualAdvancementProgressTag.isEmpty()) {
+                        capturedAdvancementsNBT.put(advancementHolder.id().toString(), individualAdvancementProgressTag);
+                    }
                 }
-
-                // Save the progress tag under the advancement's ID.
-                advTag.put(advancement.getId().toString(), progressTag);
             }
-            pdata.advancements = advTag;
+            pdataObject.advancements = capturedAdvancementsNBT;
 
-            data.savePlayerData(player.getUUID(), pdata);
+            // --- CORRECTED: Serialize PlayerData to NBT before saving ---
+            CompoundTag playerDataNbt = pdataObject.toNBT(lookupProvider); // Pass the provider
+            data.savePlayerData(player.getUUID(), playerDataNbt); // Store the CompoundTag
+            // --- END CORRECTION ---
         }
 
         // Save daytime
@@ -218,8 +213,9 @@ public class CheckpointManager {
             ServerLevel level = anchorPlayer.serverLevel();
             CheckpointData data = CheckpointData.get(level);
             WorldData worldData = data.getWorldData();
+            HolderLookup.Provider lookupProvider = level.registryAccess();
 
-            if (data.getPlayerData(data.getAnchorPlayerUUID()) == null) {
+            if (data.getPlayerData(data.getAnchorPlayerUUID(), lookupProvider) == null) {
                 logger.error("Player data is null!");
                 return;
             }
@@ -380,25 +376,42 @@ public class CheckpointManager {
 //            logger.debug("Total saved block states (chunked): {}", totalSaved);
 //            logger.debug("Performed {} block updates.", updateCount);
 
+
             // Restore block entities in the correct dimensions
             for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
                 BlockPos pos = entry.getKey();
-                int dimIndex = worldData.blockDimensionIndices.get(pos);
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
+                CompoundTag blockEntityNbt = entry.getValue();
+
+                Integer dimIndexInt = worldData.getInstanceBlockDimensionIndices().get(pos);
+                if (dimIndexInt == null) {
+                    logger.warn("No dimension index found for BlockEntity at {}. Skipping restoration.", pos);
+                    continue;
+                }
+                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndexInt));
 
                 if (dimLevel != null) {
                     BlockEntity blockEntity = dimLevel.getBlockEntity(pos);
                     if (blockEntity != null) {
-                        blockEntity.load(entry.getValue());
+
+
+                        // Use loadWithComponents as per the BlockEntity source code
+                        blockEntity.loadWithComponents(blockEntityNbt, lookupProvider);
+                        // --- END CORRECTION ---
+
                         blockEntity.setChanged();
+                    } else {
+                        logger.warn("No BlockEntity found at {} in dimension {} during restoration, though NBT was saved.",
+                                pos, dimLevel.dimension().location());
                     }
+                } else {
+                    logger.warn("Dimension level for index {} (BlockEntity at {}) not found during restoration.", dimIndexInt, pos);
                 }
             }
 
 
             // Restore all players from their saved data
             for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-                PlayerData pdata = data.getPlayerData(player.getUUID());
+                PlayerData pdata = data.getPlayerData(player.getUUID(), lookupProvider);
                 if (pdata != null) {
                     // Switch player to the correct dimension
 //                    logger.info("Player dimension: " + player.level().dimension() + ", Checkpoint dimension: " + pdata.dimension);
@@ -455,33 +468,46 @@ public class CheckpointManager {
                     }
 
                     // Restore advancements exactly as saved in the checkpoint.
-                    CompoundTag savedAdvTag = pdata.advancements;
+                    CompoundTag savedAdvTag = pdata.advancements; // This is the NBT saved earlier
                     ServerAdvancementManager advManager = level.getServer().getAdvancements();
 
-                    for (Advancement advancement : advManager.getAllAdvancements()) {
-                        AdvancementProgress currentProgress = player.getAdvancements().getOrStartProgress(advancement);
-                        CompoundTag savedProgressTag = null;
-                        String advKey = advancement.getId().toString();
+                    // Iterate through AdvancementHolders from the manager
+                    for (AdvancementHolder advancementHolder : advManager.getAllAdvancements()) {
+                        // Get the player's current progress for this advancement using the holder
+                        AdvancementProgress currentProgress = player.getAdvancements().getOrStartProgress(advancementHolder);
+
+                        CompoundTag savedProgressTagForThisAdv = null;
+                        // Use the AdvancementHolder's ID (which is a ResourceLocation) to look up in saved NBT
+                        String advKey = advancementHolder.id().toString();
                         if (savedAdvTag.contains(advKey)) {
-                            savedProgressTag = savedAdvTag.getCompound(advKey);
+                            savedProgressTagForThisAdv = savedAdvTag.getCompound(advKey);
                         }
 
-                        for (String criterion : advancement.getCriteria().keySet()) {
-                            boolean wasCompleted = savedProgressTag != null && savedProgressTag.getBoolean(criterion);
-                            boolean isCompleted = false;
-                            for (String compCriterion : currentProgress.getCompletedCriteria()) {
-                                if (compCriterion.equals(criterion)) {
-                                    isCompleted = true;
-                                    break;
-                                }
-                            }
+                        // Get the actual Advancement object if you need to access its defined criteria
+                        Advancement advancementInstance = advancementHolder.value();
 
-                            if (isCompleted && !wasCompleted) {
-                                // Revoke criteria gained after checkpoint.
-                                player.getAdvancements().revoke(advancement, criterion);
-                            } else if (!isCompleted && wasCompleted) {
-                                // Award criteria that were saved in the checkpoint.
-                                player.getAdvancements().award(advancement, criterion);
+                        // Iterate over all criteria defined for THIS advancement
+                        for (String criterionName : advancementInstance.criteria().keySet()) { // Use advancementInstance.criteria()
+                            boolean wasCompletedInSave = savedProgressTagForThisAdv != null && savedProgressTagForThisAdv.getBoolean(criterionName);
+
+                            // Check if the criterion is currently completed for the player
+                            boolean isCurrentlyCompleted = false;
+                            if (currentProgress.getCriterion(criterionName) != null) { // Check if criterion progress exists
+                                isCurrentlyCompleted = currentProgress.getCriterion(criterionName).isDone();
+                            }
+                            // Alternative way to check if currently completed, often more direct:
+                            // boolean isCurrentlyCompleted = currentProgress.getCompletedCriteria().contains(criterionName);
+                            // However, iterating all defined criteria and checking their saved vs current state is more robust for exact restoration.
+
+
+                            if (isCurrentlyCompleted && !wasCompletedInSave) {
+                                // Player has this criterion now, but didn't at checkpoint: Revoke it.
+                                player.getAdvancements().revoke(advancementHolder, criterionName); // Use holder
+                                logger.trace("Revoked advancement criterion '{}' for {} on player {}", criterionName, advKey, player.getName().getString());
+                            } else if (!isCurrentlyCompleted && wasCompletedInSave) {
+                                // Player doesn't have this criterion now, but did at checkpoint: Award it.
+                                player.getAdvancements().award(advancementHolder, criterionName); // Use holder
+                                logger.trace("Awarded advancement criterion '{}' for {} on player {}", criterionName, advKey, player.getName().getString());
                             }
                         }
                     }

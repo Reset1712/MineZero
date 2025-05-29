@@ -6,15 +6,16 @@ import boomcow.minezero.checkpoint.PlayerData;
 import boomcow.minezero.command.SetCheckPointCommand;
 import boomcow.minezero.command.SetSubaruPlayer;
 import boomcow.minezero.command.TriggerRBD;
-import boomcow.minezero.event.DeathEventHandler;
+import boomcow.minezero.event.*;
 import boomcow.minezero.input.KeyBindings;
 import boomcow.minezero.items.ArtifactFluteItem;
 import boomcow.minezero.network.PacketHandler;
 import com.mojang.logging.LogUtils;
-import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.AdvancementProgress;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -27,25 +28,22 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModLoadingContext;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
 
 import java.util.Locale;
@@ -57,43 +55,66 @@ public class MineZero {
     public static final String MODID = "minezero";
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    // Deferred Registers for blocks and items
-    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
+    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
+    // For other types like SoundEvents, you'd use:
+    // public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(Registries.SOUND_EVENT, MODID);
+
 
     // Block and BlockItem example
-    public static final RegistryObject<Block> EXAMPLE_BLOCK = BLOCKS.register("example_block",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)));
+    // DeferredRegister.register now typically returns DeferredHolder<T>
+    public static final DeferredHolder<Block, Block> EXAMPLE_BLOCK = BLOCKS.register("example_block",
+            () -> new Block(BlockBehaviour.Properties.of().strength(1.5F, 6.0F))); // Example properties for stone
 
-    public static final RegistryObject<Item> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block",
+    public static final DeferredHolder<Item, BlockItem> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block",
             () -> new BlockItem(EXAMPLE_BLOCK.get(), new Item.Properties()));
 
     // Artifact Flute Item
-    public static final RegistryObject<Item> ARTIFACT_FLUTE = ITEMS.register("artifact_flute",
+    public static final DeferredHolder<Item, ArtifactFluteItem> ARTIFACT_FLUTE = ITEMS.register("artifact_flute",
             () -> new ArtifactFluteItem(new Item.Properties().stacksTo(1)));
 
-    public MineZero() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+    public MineZero(IEventBus modEventBus, ModContainer modContainer) { // NeoForge MDKs often pass IEventBus to constructor
 
-        // Register event listeners and Deferred Registers
+        // Register event listeners on the MOD event bus
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::clientSetup); // Client setup on mod bus
+        modEventBus.addListener(this::registerKeyMappings); // Key mappings on mod bus
         modEventBus.addListener(this::addCreative);
-        modEventBus.addListener(this::setupNetworking);
+        // Config events on mod bus
+        modEventBus.addListener(ConfigHandler::onLoad); // Assuming static methods in ConfigHandler
+        modEventBus.addListener(ConfigHandler::onReload);
 
+        // Register DeferredRegisters to the mod event bus
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
+        ModSoundEvents.SOUND_EVENTS.register(modEventBus); // Register sounds
+        PacketHandler.register(modEventBus);
 
-        // Register event handlers
-        MinecraftForge.EVENT_BUS.register(this);
-        MinecraftForge.EVENT_BUS.register(new DeathEventHandler());
+        // Register general event handlers to the NeoForge event bus
+        NeoForge.EVENT_BUS.register(this); // For @SubscribeEvent methods in this class
+        NeoForge.EVENT_BUS.register(new DeathEventHandler());
+
+        NeoForge.EVENT_BUS.register(BlockChangeListener.class); // <--- ADD THIS LINE
+        NeoForge.EVENT_BUS.register(CheckpointTicker.class); // <--- ADD THIS LINE
+        NeoForge.EVENT_BUS.register(ExplosionEventHandler.class); // <--- ADD THIS LINE
+        NeoForge.EVENT_BUS.register(GlobalTickHandler.class); // <--- ADD THIS LINE
+        NeoForge.EVENT_BUS.register(LightningStrikeListener.class); // Register DeathEventHandler for player death events
+        NeoForge.EVENT_BUS.register(NonPlayerChangeHandler.class); // Register DeathEventHandler for player death events
 
 
 
 
-        ModSoundEvents.register(FMLJavaModLoadingContext.get().getModEventBus());
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ConfigHandler.COMMON_CONFIG);
+
+        if (modContainer != null) { // Ensure modContainer is available
+            modContainer.registerConfig(ModConfig.Type.COMMON, ConfigHandler.COMMON_CONFIG_SPEC);
+        } else {
+            LOGGER.warn("ModContainer was not injected, attempting to get active container for config registration. This might be unreliable.");
+            ModContainer fallbackContainer = ModLoadingContext.get().getActiveContainer();
+            LOGGER.error("CRITICAL: ModContainer not available for config registration. Configs will not be loaded for {}.", MODID);
+        }
     }
 
+    // RegisterCommandsEvent is on the NeoForge event bus
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         SetCheckPointCommand.register(event.getDispatcher());
@@ -101,68 +122,58 @@ public class MineZero {
         TriggerRBD.register(event.getDispatcher());
     }
 
-
-
     private void commonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("HELLO FROM COMMON SETUP");
-        LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
-        // Force the ModGameRules class to load its static fields.
+        LOGGER.info("DIRT BLOCK >> {}", BuiltInRegistries.BLOCK.getKey(Blocks.DIRT));
+
         LOGGER.info("Loading custom game rules: autoCheckpointEnabled = {}", ModGameRules.AUTO_CHECKPOINT_ENABLED);
+
+        // --- CORRECTED: Use event.enqueueWork directly ---
+        // If you have tasks for common setup that need to be on the main thread:
+        event.enqueueWork(() -> {
+            LOGGER.info("This is a task running on the main thread after common setup dispatch (from commonSetup).");
+            // Example: Some registration that must happen on main thread and isn't an event listener setup.
+            // MyOtherClass.initializeCommonThreadSafeStuff();
+        });
+        // --- END CORRECTION ---
     }
 
-    private void addCreative(BuildCreativeModeTabContentsEvent event) {
+    // Listener for BuildCreativeModeTabContentsEvent (on NeoForge.EVENT_BUS)
+    public void addCreative(BuildCreativeModeTabContentsEvent event) {
+        // Accessing CreativeModeTabs constants directly
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
-            event.accept(EXAMPLE_BLOCK_ITEM.get());
+            event.accept(EXAMPLE_BLOCK_ITEM.get()); // .get() on DeferredHolder
         }
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(ARTIFACT_FLUTE.get());
+            event.accept(ARTIFACT_FLUTE.get()); // .get() on DeferredHolder
         }
     }
 
-    private void setupNetworking(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> { // Use enqueueWork for thread safety during setup
-            PacketHandler.register();
-        });
-    }
+    // setupNetworking merged into commonSetup via enqueueWork
 
-    @SubscribeEvent
-    public static void onLoad(final ModConfigEvent.Loading configEvent) {
-        LOGGER.info("Loading MineZero config");
-        ConfigHandler.loadConfig(configEvent.getConfig());
-    }
+    // Config event listeners are now registered in the constructor to the modEventBus
+    // The static methods in ConfigHandler will be called.
 
-    @SubscribeEvent
-    public static void onReload(final ModConfigEvent.Reloading configEvent) {
-        LOGGER.info("Reloading MineZero config");
-        ConfigHandler.loadConfig(configEvent.getConfig());
-    }
 
+    // PlayerEvent.PlayerLoggedInEvent is on the NeoForge event bus
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (player.level().isClientSide()) return; // Ensure we're on the server
+        if (player.level().isClientSide()) return;
 
-        ServerLevel level = player.serverLevel(); // Correct way to get ServerLevel
+        ServerLevel level = player.serverLevel();
         CheckpointData data = CheckpointData.get(level);
+        HolderLookup.Provider lookupProvider = level.registryAccess();
 
         LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) logged in.", player.getName().getString(), player.getUUID());
 
-        // Scenario 1: No anchor player set yet (e.g., first player ever on a new world)
-        // AND no checkpoint data exists for this player yet (which would be true if they are the first)
-        if (data.getAnchorPlayerUUID() == null && data.getPlayerData(player.getUUID()) == null) {
-            LOGGER.info("[MineZero][LOGIN] No anchor player set and player {} is new to checkpoint. Setting initial checkpoint for this player.", player.getName().getString());
-            // This will set the current player as the anchor and save their state, effectively creating the first checkpoint.
+        if (data.getAnchorPlayerUUID() == null && data.getPlayerData(player.getUUID(), lookupProvider) == null) {
+            LOGGER.info("[MineZero][LOGIN] No anchor player set and player {} is new. Setting initial checkpoint.", player.getName().getString());
             CheckpointManager.setCheckpoint(player);
-            // data.setAnchorPlayerUUID(player.getUUID()); // setCheckpoint already does this
-            // data.setDirty(); // setCheckpoint calls savePlayerData which calls setDirty
-            LOGGER.info("[MineZero][LOGIN] 🎯 Initial anchor and checkpoint set for {}", player.getName().getString());
-        }
-        // Scenario 2: An anchor player IS set, but THIS player logging in does not have data in the current checkpoint
-        else if (data.getPlayerData(player.getUUID()) == null) {
+            LOGGER.info("[MineZero][LOGIN] Initial anchor and checkpoint set for {}", player.getName().getString());
+        } else if (data.getPlayerData(player.getUUID(), lookupProvider) == null) {
             LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) not found in current checkpoint data. Adding them now.", player.getName().getString(), player.getUUID());
-
             PlayerData pDataForNewPlayer = new PlayerData();
-            // Capture player's current state
             pDataForNewPlayer.posX = player.getX();
             pDataForNewPlayer.posY = player.getY();
             pDataForNewPlayer.posZ = player.getZ();
@@ -191,8 +202,8 @@ public class MineZero {
             }
 
             pDataForNewPlayer.potionEffects.clear();
-            for (MobEffectInstance effect : player.getActiveEffects()) {
-                pDataForNewPlayer.potionEffects.add(new MobEffectInstance(effect));
+            for (MobEffectInstance effectInstance : player.getActiveEffects()) { // Renamed variable for clarity
+                pDataForNewPlayer.potionEffects.add(new MobEffectInstance(effectInstance)); // Copy constructor
             }
 
             pDataForNewPlayer.inventory.clear();
@@ -201,53 +212,71 @@ public class MineZero {
             }
 
             CompoundTag advTag = new CompoundTag();
-            if (player.server != null) { // player.server can be null during very early login stages
-                for (Advancement advancement : player.server.getAdvancements().getAllAdvancements()) {
-                    AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
+            if (player.server != null) {
+                for (AdvancementHolder advancementHolder : player.server.getAdvancements().getAllAdvancements()) {
+                    // Advancement advancement = advancementHolder.value(); // Not needed if getOrStartProgress takes Holder
+                    AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancementHolder);
                     CompoundTag progressTag = new CompoundTag();
                     for (String criterion : progress.getCompletedCriteria()) {
                         progressTag.putBoolean(criterion, true);
                     }
-                    advTag.put(advancement.getId().toString(), progressTag);
+                    advTag.put(advancementHolder.id().toString(), progressTag); // Use holder.id()
                 }
             }
             pDataForNewPlayer.advancements = advTag;
 
-            // Save this new player's data to the existing checkpoint
-            data.savePlayerData(player.getUUID(), pDataForNewPlayer);
-            // data.setDirty(); // savePlayerData calls setDirty()
-            LOGGER.info("[MineZero][LOGIN] Player {} added to checkpoint with their current state.", player.getName().getString());
+            CompoundTag playerDataNbt = pDataForNewPlayer.toNBT(lookupProvider); // Use the lookupProvider obtained earlier
+            data.savePlayerData(player.getUUID(), playerDataNbt);
+            LOGGER.info("[MineZero][LOGIN] Player {} added to checkpoint.", player.getName().getString());
         } else {
-            // Player is already known to the checkpoint system (either as anchor or regular player with data)
-            LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) already has data in the checkpoint.", player.getName().getString(), player.getUUID());
-            // DEBUG: log both the current player UUID and the stored anchor
+            LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) already has data in checkpoint.", player.getName().getString(), player.getUUID());
             LOGGER.info("[MineZero][LOGIN] Player UUID = {}, Stored Anchor = {}",
                     player.getUUID(), data.getAnchorPlayerUUID());
         }
     }
 
-
+    // ServerStartingEvent is on the NeoForge event bus
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("HELLO from server starting");
     }
 
-    @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ClientModEvents {
+    // Client specific setup, on MOD event bus
+    private void clientSetup(final FMLClientSetupEvent event) {
+        LOGGER.info("HELLO FROM CLIENT SETUP (Mod Event Bus)");
 
-        @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event) {
-            LOGGER.info("HELLO FROM CLIENT SETUP");
-            LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+        // Register client-specific game event handlers to NeoForge.EVENT_BUS
+        NeoForge.EVENT_BUS.register(ClientForgeEvents.class);
 
+        // --- CORRECTED: Use event.enqueueWork directly ---
+        // For client-side tasks that need to run on the main game thread after client setup
+        event.enqueueWork(() -> {
+            LOGGER.info("Performing client-side enqueued work (from clientSetup).");
+            // Example: KeyBindings.initModels(), screen registrations, renderer registrations
+            // SomeModelRegistry.registerModels();
+            // SomeScreenRegistry.registerScreens();
+        });
+        // --- END CORRECTION ---
+    }
+
+    // Key Mappings registration, on MOD event bus
+    private void registerKeyMappings(final RegisterKeyMappingsEvent event) {
+        LOGGER.info("Registering MineZero Key Mappings (Mod Event Bus)");
+
+        // Get the KeyMapping instance from the Lazy object using .get()
+        if (KeyBindings.EXAMPLE_ACTION_KEY != null) { // The Lazy object itself can be checked for null if not final, though usually it's final
+            event.register(KeyBindings.EXAMPLE_ACTION_KEY.get()); // <--- Use .get()
         }
-
-        @SubscribeEvent
-        public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
-            LOGGER.info("Registering MineZero Key Mappings");
-            event.register(KeyBindings.EXAMPLE_ACTION_KEY);
-            event.register(KeyBindings.SELF_DAMAGE_KEY);
-            // Register other keybindings here if you add more
+        if (KeyBindings.SELF_DAMAGE_KEY != null) {
+            event.register(KeyBindings.SELF_DAMAGE_KEY.get());    // <--- Use .get()
         }
     }
+
+
+    // The static inner class for client events is no longer strictly necessary
+    // if its methods (clientSetup, registerKeyMappings) are moved to the main class
+    // and registered correctly on the MOD event bus with Dist.CLIENT filtering if needed,
+    // or if they are Dist-specific events like FMLClientSetupEvent.
+    // @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    // public static class ClientModEvents { ... }
 }

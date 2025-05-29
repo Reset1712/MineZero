@@ -2,6 +2,7 @@ package boomcow.minezero.checkpoint;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -53,14 +54,16 @@ public class CheckpointData extends SavedData {
     }
     private Map<UUID, CompoundTag> playersData = new HashMap<>();
 
-    public void savePlayerData(UUID uuid, PlayerData pdata) {
-        playersData.put(uuid, pdata.toNBT());
+    public void savePlayerData(UUID uuid, CompoundTag playerDataNBT) { // Now takes pre-serialized NBT
+        this.playersData.put(uuid, playerDataNBT);
         setDirty();
     }
 
-    public PlayerData getPlayerData(UUID uuid) {
-        if (playersData.containsKey(uuid)) {
-            return PlayerData.fromNBT(playersData.get(uuid));
+    // getPlayerData now needs HolderLookup.Provider to deserialize
+    public PlayerData getPlayerData(UUID uuid, HolderLookup.Provider lookupProvider) {
+        CompoundTag nbt = playersData.get(uuid);
+        if (nbt != null) {
+            return PlayerData.fromNBT(nbt, lookupProvider);
         }
         return null;
     }
@@ -123,11 +126,15 @@ public class CheckpointData extends SavedData {
         this.setDirty();
     }
 
-    public static CheckpointData load(CompoundTag nbt) {
+    public static CheckpointData load(CompoundTag nbt, HolderLookup.Provider lookupProvider) {
         CheckpointData data = new CheckpointData(); // worldData is already initialized in constructor
 
         if (nbt.contains(KEY_CHECKPOINT_DIMENSION, Tag.TAG_STRING)) {
-            data.checkpointDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(nbt.getString(KEY_CHECKPOINT_DIMENSION)));
+            try {
+                data.checkpointDimension = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(nbt.getString(KEY_CHECKPOINT_DIMENSION)));
+            } catch (Exception e) {
+                LOGGER.warn("Failed to parse checkpointDimension ResourceLocation: {}", nbt.getString(KEY_CHECKPOINT_DIMENSION), e);
+            }
         }
 
         if (nbt.contains(KEY_PLAYERS_DATA, Tag.TAG_COMPOUND)) {
@@ -156,13 +163,6 @@ public class CheckpointData extends SavedData {
         data.checkpointXP = nbt.getInt(KEY_CHECKPOINT_XP);
         data.checkpointDayTime = nbt.getLong(KEY_CHECKPOINT_DAY_TIME);
 
-        if (nbt.contains(KEY_CHECKPOINT_INVENTORY, Tag.TAG_LIST)) {
-            ListTag invListTag = nbt.getList(KEY_CHECKPOINT_INVENTORY, Tag.TAG_COMPOUND);
-            data.checkpointInventory.clear();
-            for (int i = 0; i < invListTag.size(); i++) {
-                data.checkpointInventory.add(ItemStack.of(invListTag.getCompound(i)));
-            }
-        }
 
         if (nbt.contains(KEY_ENTITY_DATA, Tag.TAG_LIST)) {
             ListTag entityListTag = nbt.getList(KEY_ENTITY_DATA, Tag.TAG_COMPOUND);
@@ -177,16 +177,17 @@ public class CheckpointData extends SavedData {
             data.entityDimensions.clear();
             for (int i = 0; i < entityDimListTag.size(); i++) {
                 try {
-                    data.entityDimensions.add(ResourceKey.create(Registries.DIMENSION, new ResourceLocation(entityDimListTag.getString(i))));
+                    data.entityDimensions.add(ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(entityDimListTag.getString(i))));
                 } catch (Exception e) {
                     LOGGER.warn("Failed to load entity dimension from NBT: {}", entityDimListTag.getString(i), e);
                 }
             }
         }
-        // Basic validation for entity data and dimensions
-        if (data.entityData.size() > 0 && data.entityDimensions.size() > 0 && data.entityData.size() != data.entityDimensions.size()) {
-            LOGGER.warn("Mismatch in loaded entityData ({}) and entityDimensions ({}). Checkpoint entity data might be incomplete.", data.entityData.size(), data.entityDimensions.size());
-            // Consider clearing both or trimming to the minimum size if this is a critical error.
+        if (data.entityData.size() > 0 && data.entityData.size() != data.entityDimensions.size()) {
+            LOGGER.warn("Mismatch in loaded entityData ({}) and entityDimensions ({}). Entity data might be corrupt or incomplete.", data.entityData.size(), data.entityDimensions.size());
+            // Optionally clear both lists if this is critical data integrity issue
+            // data.entityData.clear();
+            // data.entityDimensions.clear();
         }
 
 
@@ -219,7 +220,7 @@ public class CheckpointData extends SavedData {
         // Load WorldData
         if (nbt.contains(KEY_WORLD_DATA, Tag.TAG_COMPOUND)) {
             // data.worldData is already initialized, so we just load into it
-            data.worldData.loadFromNBT(nbt.getCompound(KEY_WORLD_DATA));
+            data.worldData.loadFromNBT(nbt.getCompound(KEY_WORLD_DATA), lookupProvider);
         } else {
             LOGGER.warn("Checkpoint NBT is missing WorldData. A new empty WorldData will be used.");
             // data.worldData will be the new empty one from the constructor
@@ -230,7 +231,7 @@ public class CheckpointData extends SavedData {
 
     // Saves nbt data to a compound tag
     @Override
-    public CompoundTag save(CompoundTag nbt) {
+    public CompoundTag save(CompoundTag nbt, HolderLookup.Provider provider) {
         if (checkpointDimension != null) {
             nbt.putString(KEY_CHECKPOINT_DIMENSION, checkpointDimension.location().toString());
         }
@@ -257,13 +258,7 @@ public class CheckpointData extends SavedData {
         nbt.putInt(KEY_CHECKPOINT_XP, checkpointXP);
         nbt.putLong(KEY_CHECKPOINT_DAY_TIME, checkpointDayTime);
 
-        ListTag invListTag = new ListTag();
-        for (ItemStack stack : checkpointInventory) {
-            if (!stack.isEmpty()) { // Avoid saving empty item stacks if not needed
-                invListTag.add(stack.save(new CompoundTag()));
-            }
-        }
-        nbt.put(KEY_CHECKPOINT_INVENTORY, invListTag);
+
 
         ListTag entityListNbt = new ListTag();
         for (CompoundTag entityNBT : entityData) {
@@ -302,8 +297,21 @@ public class CheckpointData extends SavedData {
     }
 
     public static CheckpointData get(ServerLevel level) {
+        // The DimensionDataStorage system will provide the HolderLookup.Provider
+        // to the factory's load method (the second argument of the BiFunction).
+
+        SavedData.Factory<CheckpointData> factory = new SavedData.Factory<>(
+                () -> new CheckpointData(), // Supplier: () -> T
+                // Deserializer: (CompoundTag nbt, HolderLookup.Provider provider) -> T
+                // The 'provider' here is supplied by the game's SavedData loading mechanism.
+                (nbt, provider) -> CheckpointData.load(nbt, provider), // <--- CORRECTED LAMBDA SIGNATURE
+                null // Optional DataFixerOptions, use DataFixerOptions.none() if no datafixers or null in some versions.
+                // Check your NeoForge SavedData.Factory constructor, it might take DataFixerOptions.
+                // If it takes DataFixerType, then null is fine if you don't use it.
+        );
+
         return level.getServer().overworld().getDataStorage()
-                .computeIfAbsent(CheckpointData::load, CheckpointData::new, CheckpointData.DATA_NAME);
+                .computeIfAbsent(factory, CheckpointData.DATA_NAME);
     }
 
     public String toString(ServerLevel level) {

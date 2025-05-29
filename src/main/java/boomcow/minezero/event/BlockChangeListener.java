@@ -13,17 +13,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Mod.EventBusSubscriber
 public class BlockChangeListener {
     private static final Logger LOGGER_BCL = LogManager.getLogger("MineZeroBCL");
     private static WorldData getActiveWorldData(ServerLevel level) {
@@ -133,11 +131,11 @@ public class BlockChangeListener {
             BlockPos clickedPos = event.getPos().immutable(); // The block that was clicked
             BlockPos targetPos = clickedPos.relative(event.getFace()).immutable(); // The block where fluid might be placed/removed
 
-            if (bucketItem.getFluid() == Fluids.LAVA || bucketItem.getFluid() == Fluids.WATER) { // Placing fluid
+            if (bucketItem.content == Fluids.LAVA || bucketItem.content == Fluids.WATER) { // Placing fluid
                 worldDataInstance.getModifiedFluidBlocks().add(targetPos); // Access via instance
                 worldDataInstance.getInstanceBlockDimensionIndices().put(targetPos, WorldData.getDimensionIndex(level.dimension()));// Access via instance
                 LOGGER_BCL.info("Fluid placed at: " + targetPos + " tracking in instance WorldData.");
-            } else if (bucketItem.getFluid() == Fluids.EMPTY) { // Picking up fluid
+            } else if (bucketItem.content == Fluids.EMPTY) { // Picking up fluid
                 // When picking up, the fluid is AT the clickedPos (if it's a source block)
                 // or at targetPos if you clicked an adjacent solid block.
                 // Minecraft's BucketItem logic targets the block clicked OR the space next to it.

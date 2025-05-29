@@ -1,6 +1,7 @@
 package boomcow.minezero.event;
 
 import boomcow.minezero.ConfigHandler;
+import boomcow.minezero.MineZero;
 import boomcow.minezero.ModSoundEvents;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
@@ -10,9 +11,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -78,37 +79,36 @@ public class DeathEventHandler {
     }
 
     private void playClassicChime(ServerPlayer player) {
-        // Stop previous death chime
-        Logger logger = LogManager.getLogger();
-        logger.debug("Playing classic chime");
+
+        // --- CORRECTED ResourceLocation ---
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                new ResourceLocation("minezero", "death_chime"), // The exact sound name
+                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "death_chime"), // Use static factory method
                 SoundSource.PLAYERS
         );
-        player.connection.send(stopSoundPacket);
+        // --- End Correction ---
 
-        // Play new death chime
+        if (player.connection != null) { // Good to check connection before sending packets
+            player.connection.send(stopSoundPacket);
+        }
+
+        // Ensure ModSoundEvents.DEATH_CHIME.get() returns a valid SoundEvent
         player.playNotifySound(ModSoundEvents.DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
-
-
-
     }
 
     private void playAlternateChime(ServerPlayer player) {
-        // Stop previous death chime
-        Logger logger = LogManager.getLogger();
-        logger.debug("Playing alternate chime");
+
+        // --- CORRECTED ResourceLocation ---
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                new ResourceLocation("minezero", "alt_death_chime"), // The exact sound name
+                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "alt_death_chime"), // Use static factory method
                 SoundSource.PLAYERS
         );
-        player.connection.send(stopSoundPacket);
+        // --- End Correction ---
 
-        // Play new death chime
+        if (player.connection != null) {
+            player.connection.send(stopSoundPacket);
+        }
+
         player.playNotifySound(ModSoundEvents.ALT_DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
-
-
-
     }
 
 }

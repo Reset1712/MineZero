@@ -15,10 +15,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.level.BlockEvent.EntityPlaceEvent;
-import net.minecraftforge.event.level.ExplosionEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.ExplosionEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber
 public class NonPlayerChangeHandler {
 
     private static WorldData getActiveWorldData(ServerLevel level) {
@@ -37,7 +35,7 @@ public class NonPlayerChangeHandler {
     }
 
     @SubscribeEvent
-    public static void onFirePlaced(EntityPlaceEvent event) {
+    public static void onFirePlaced(BlockEvent.EntityPlaceEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         Logger logger = LogManager.getLogger();
 //        logger.info("Fire placed at: " + event.getPos());
@@ -127,7 +125,7 @@ public class NonPlayerChangeHandler {
         if (anchorPlayer == null || anchorPlayer.isDeadOrDying()) return;
 
         Explosion explosion = event.getExplosion();
-        Vec3 explosionPos = explosion.getPosition();
+        Vec3 explosionPos = explosion.center();
         float explosionRadius = getExplosionRadius(explosion);
 
         double distance = anchorPlayer.position().distanceTo(explosionPos);

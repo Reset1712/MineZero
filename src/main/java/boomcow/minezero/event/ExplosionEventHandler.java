@@ -3,11 +3,10 @@ package boomcow.minezero.event;
 import boomcow.minezero.checkpoint.CheckpointData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.level.ExplosionEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.level.ExplosionEvent;
 
-@Mod.EventBusSubscriber
+
 public class ExplosionEventHandler {
 
     @SubscribeEvent

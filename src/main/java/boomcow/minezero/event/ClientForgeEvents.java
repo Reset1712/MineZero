@@ -1,42 +1,40 @@
 package boomcow.minezero.event;
 
-import boomcow.minezero.MineZero;
 import boomcow.minezero.input.KeyBindings;
-import boomcow.minezero.network.PacketHandler; // Import PacketHandler
-import boomcow.minezero.network.SelfDamagePacket; // Import the packet
+import boomcow.minezero.network.SelfDamagePacket;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import com.mojang.logging.LogUtils;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
 
-@Mod.EventBusSubscriber(modid = MineZero.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-public class ClientForgeEvents {
+public class ClientForgeEvents { // Renaming to ClientGameEvents or similar might be clearer
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            Minecraft mc = Minecraft.getInstance(); // Get instance once
-            if (mc.player != null) {
+    public static void onClientTickPostEvent(ClientTickEvent.Post event) { // Renamed method for clarity
+        // No phase check needed because we are subscribing to the specific Post event
 
-                // Existing keybind check
-                while (KeyBindings.EXAMPLE_ACTION_KEY.consumeClick()) {
-                    LOGGER.info("Example Action Key Pressed!");
-                    mc.player.sendSystemMessage(Component.literal("Example Keybind Pressed!"));
-                }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) {
+            return;
+        }
 
-                // --- New Keybind Check ---
-                while (KeyBindings.SELF_DAMAGE_KEY.consumeClick()) {
-                    LOGGER.debug("Self Damage Key Pressed - Sending Packet!");
-                    // Send the packet to the server
-                    PacketHandler.INSTANCE.sendToServer(new SelfDamagePacket());
-                }
-                // --- End New Keybind Check ---
+        // Use .get() to get the KeyMapping instance from Lazy
+        if (KeyBindings.EXAMPLE_ACTION_KEY != null) { // Lazy itself won't be null, but good to be safe if it could be
+            while (KeyBindings.EXAMPLE_ACTION_KEY.get().consumeClick()) {
+                LOGGER.info("Example Action Key Pressed!");
+                mc.player.sendSystemMessage(Component.literal("Example Keybind Pressed!"));
+            }
+        }
+
+        if (KeyBindings.SELF_DAMAGE_KEY != null) {
+            while (KeyBindings.SELF_DAMAGE_KEY.get().consumeClick()) {
+                LOGGER.debug("Self Damage Key Pressed - Sending Packet!");
+                PacketDistributor.sendToServer(new SelfDamagePacket());
             }
         }
     }

@@ -6,14 +6,13 @@ import boomcow.minezero.checkpoint.CheckpointManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import java.util.concurrent.ThreadLocalRandom;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod.EventBusSubscriber
+import java.util.concurrent.ThreadLocalRandom;
+
 public class CheckpointTicker {
 
     private static final Logger LOGGER = LogManager.getLogger(CheckpointTicker.class);
@@ -28,8 +27,7 @@ public class CheckpointTicker {
     private static int intervalTicks = 0;
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) return;
+    public static void onServerTickPost(ServerTickEvent.Post event) { // <--- THE KEY CHANGE HERE
         MinecraftServer server = event.getServer();
         ServerLevel level = server.overworld();
         if (level == null) return;

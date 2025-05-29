@@ -1,12 +1,11 @@
 package boomcow.minezero.checkpoint;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerChunkCache;
@@ -14,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -118,6 +118,7 @@ public class WorldData {
     public WorldData() {
         this.blockEntityData = new HashMap<>();
         this.dayTime = 0;
+
     }
 
     /**
@@ -242,7 +243,11 @@ public class WorldData {
         }
 
         public static LightningStrike fromNBT(CompoundTag tag) {
-            BlockPos pos = NbtUtils.readBlockPos(tag.getCompound(KEY_POS));
+            // Corrected way to parse BlockPos using CODEC:
+            BlockPos pos = BlockPos.CODEC.parse(NbtOps.INSTANCE, tag.getCompound(KEY_POS))
+                    .resultOrPartial(LOGGER_WD::error) // Log any parsing errors
+                    .orElse(BlockPos.ZERO); // Provide a default in case of failure
+
             long tickTime = tag.getLong(KEY_TICK_TIME);
             return new LightningStrike(pos, tickTime);
         }
@@ -361,7 +366,7 @@ public class WorldData {
                         BlockEntity blockEntity = chunk.getBlockEntity(entityPos);
                         if (blockEntity != null && !blockEntity.isRemoved()) {
                             BlockPos immutablePos = entityPos.immutable();
-                            saveBlockEntity(immutablePos, blockEntity.saveWithFullMetadata());
+                            saveBlockEntity(immutablePos, blockEntity.saveWithFullMetadata(level.registryAccess()));
                             blockDimensionIndices.put(immutablePos, getDimensionIndex(currentDimension));
                         }
                     }
@@ -508,7 +513,7 @@ public class WorldData {
         return nbt;
     }
 
-    public void loadFromNBT(CompoundTag nbt) {
+    public void loadFromNBT(CompoundTag nbt, HolderLookup.Provider lookupProvider) {
         this.isRaining = nbt.getBoolean(KEY_WD_IS_RAINING);
         this.isThundering = nbt.getBoolean(KEY_WD_IS_THUNDERING);
         this.rainTime = nbt.getInt(KEY_WD_RAIN_TIME);
@@ -518,13 +523,20 @@ public class WorldData {
         this.dayTime = nbt.getLong(KEY_WD_DAY_TIME);
         this.gameTime = nbt.getLong(KEY_WD_GAME_TIME);
 
+        // IMPORTANT: Create NbtOps with the current lookupProvider for robust codec parsing.
+        // This is crucial for anything that relies on registry lookups (like BlockStates, Items, etc.).
+
+
         // BlockEntityData
         this.blockEntityData.clear();
         if (nbt.contains(KEY_WD_BLOCK_ENTITY_DATA, Tag.TAG_LIST)) {
             ListTag beListTag = nbt.getList(KEY_WD_BLOCK_ENTITY_DATA, Tag.TAG_COMPOUND);
             for (int i = 0; i < beListTag.size(); i++) {
                 CompoundTag beEntryTag = beListTag.getCompound(i);
-                BlockPos pos = NbtUtils.readBlockPos(beEntryTag.getCompound(KEY_MAP_KEY_POS));
+                // Use NbtOps.INSTANCE for BlockPos.CODEC.parse (it does not require registry context)
+                BlockPos pos = BlockPos.CODEC.parse(NbtOps.INSTANCE, beEntryTag.getCompound(KEY_MAP_KEY_POS))
+                        .resultOrPartial(LOGGER_WD::error)
+                        .orElse(BlockPos.ZERO);
                 CompoundTag valueNbt = beEntryTag.getCompound(KEY_MAP_VALUE_NBT);
                 this.blockEntityData.put(pos, valueNbt);
             }
@@ -540,6 +552,8 @@ public class WorldData {
                 ListTag blocksInChunkTag = chunkEntryTag.getList(KEY_BLOCKS_IN_CHUNK, Tag.TAG_COMPOUND);
                 List<SavedBlock> blocks = new ArrayList<>();
                 for (int j = 0; j < blocksInChunkTag.size(); j++) {
+                    // SavedBlock.fromNBT should handle its own BlockPos and BlockState reading correctly.
+                    // It should also ideally receive the lookupProvider or use NbtOps.create(provider).
                     blocks.add(SavedBlock.fromNBT(blocksInChunkTag.getCompound(j)));
                 }
                 this.savedBlocksByChunk.put(chunkPos, blocks);
@@ -551,15 +565,27 @@ public class WorldData {
         if (nbt.contains(KEY_WD_SAVED_LIGHTNINGS, Tag.TAG_LIST)) {
             ListTag lightningListTag = nbt.getList(KEY_WD_SAVED_LIGHTNINGS, Tag.TAG_COMPOUND);
             for (int i = 0; i < lightningListTag.size(); i++) {
+                // LightningStrike.fromNBT should ideally also use the lookupProvider if it deserializes entities etc.
                 this.savedLightnings.add(LightningStrike.fromNBT(lightningListTag.getCompound(i)));
             }
         }
 
         // --- Load Instance Block Change Tracking Fields ---
+
+        // Prepare HolderGetter<Block> once for all BlockState reading in this method
+        // Use the stored lookupProvider
+        HolderGetter<Block> blockHolderGetter = lookupProvider.lookupOrThrow(Registries.BLOCK);
+
         this.blockPositions.clear();
         if (nbt.contains(KEY_WD_BLOCK_POSITIONS, Tag.TAG_LIST)) {
             ListTag listTag = nbt.getList(KEY_WD_BLOCK_POSITIONS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.blockPositions.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+            for (int i = 0; i < listTag.size(); i++) {
+                this.blockPositions.add(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, listTag.getCompound(i)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO)
+                );
+            }
         }
 
         this.blockDimensionIndices.clear();
@@ -567,14 +593,25 @@ public class WorldData {
             ListTag listTag = nbt.getList(KEY_WD_BLOCK_DIMENSION_INDICES, Tag.TAG_COMPOUND);
             for (int i = 0; i < listTag.size(); i++) {
                 CompoundTag entryTag = listTag.getCompound(i);
-                this.blockDimensionIndices.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), entryTag.getInt(KEY_MAP_VALUE_INT));
+                this.blockDimensionIndices.put(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, entryTag.getCompound(KEY_MAP_KEY_POS)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO),
+                        entryTag.getInt(KEY_MAP_VALUE_INT)
+                );
             }
         }
 
         this.modifiedBlocks.clear();
         if (nbt.contains(KEY_WD_MODIFIED_BLOCKS, Tag.TAG_LIST)) {
             ListTag listTag = nbt.getList(KEY_WD_MODIFIED_BLOCKS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.modifiedBlocks.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+            for (int i = 0; i < listTag.size(); i++) {
+                this.modifiedBlocks.add(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, listTag.getCompound(i)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO)
+                );
+            }
         }
 
         this.minedBlocks.clear();
@@ -582,20 +619,37 @@ public class WorldData {
             ListTag listTag = nbt.getList(KEY_WD_MINED_BLOCKS, Tag.TAG_COMPOUND);
             for (int i = 0; i < listTag.size(); i++) {
                 CompoundTag entryTag = listTag.getCompound(i);
-                this.minedBlocks.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), entryTag.getCompound(KEY_MAP_VALUE_STATE)));
+                this.minedBlocks.put(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, entryTag.getCompound(KEY_MAP_KEY_POS)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO),
+                        NbtUtils.readBlockState(blockHolderGetter, entryTag.getCompound(KEY_MAP_VALUE_STATE))
+                );
             }
         }
 
         this.addedEyes.clear();
         if (nbt.contains(KEY_WD_ADDED_EYES, Tag.TAG_LIST)) {
             ListTag listTag = nbt.getList(KEY_WD_ADDED_EYES, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.addedEyes.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+            for (int i = 0; i < listTag.size(); i++) {
+                this.addedEyes.add(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, listTag.getCompound(i)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO)
+                );
+            }
         }
 
         this.modifiedFluidBlocks.clear();
         if (nbt.contains(KEY_WD_MODIFIED_FLUID_BLOCKS, Tag.TAG_LIST)) {
             ListTag listTag = nbt.getList(KEY_WD_MODIFIED_FLUID_BLOCKS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.modifiedFluidBlocks.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+            for (int i = 0; i < listTag.size(); i++) {
+                this.modifiedFluidBlocks.add(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, listTag.getCompound(i)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO)
+                );
+            }
         }
 
         this.minedFluidBlocks.clear();
@@ -603,14 +657,25 @@ public class WorldData {
             ListTag listTag = nbt.getList(KEY_WD_MINED_FLUID_BLOCKS, Tag.TAG_COMPOUND);
             for (int i = 0; i < listTag.size(); i++) {
                 CompoundTag entryTag = listTag.getCompound(i);
-                this.minedFluidBlocks.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), entryTag.getCompound(KEY_MAP_VALUE_STATE)));
+                this.minedFluidBlocks.put(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, entryTag.getCompound(KEY_MAP_KEY_POS)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO),
+                        NbtUtils.readBlockState(blockHolderGetter, entryTag.getCompound(KEY_MAP_VALUE_STATE))
+                );
             }
         }
 
         this.createdPortals.clear();
         if (nbt.contains(KEY_WD_CREATED_PORTALS, Tag.TAG_LIST)) {
             ListTag listTag = nbt.getList(KEY_WD_CREATED_PORTALS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.createdPortals.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+            for (int i = 0; i < listTag.size(); i++) {
+                this.createdPortals.add(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, listTag.getCompound(i)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO)
+                );
+            }
         }
 
         this.destroyedPortals.clear();
@@ -618,43 +683,64 @@ public class WorldData {
             ListTag listTag = nbt.getList(KEY_WD_DESTROYED_PORTALS, Tag.TAG_COMPOUND);
             for (int i = 0; i < listTag.size(); i++) {
                 CompoundTag entryTag = listTag.getCompound(i);
-                this.destroyedPortals.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), entryTag.getCompound(KEY_MAP_VALUE_STATE)));
+                this.destroyedPortals.put(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, entryTag.getCompound(KEY_MAP_KEY_POS)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO),
+                        NbtUtils.readBlockState(blockHolderGetter, entryTag.getCompound(KEY_MAP_VALUE_STATE))
+                );
             }
         }
 
         this.newFires.clear();
         if (nbt.contains(KEY_WD_NEW_FIRES, Tag.TAG_LIST)) {
             ListTag listTag = nbt.getList(KEY_WD_NEW_FIRES, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.newFires.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+            for (int i = 0; i < listTag.size(); i++) {
+                this.newFires.add(
+                        BlockPos.CODEC.parse(NbtOps.INSTANCE, listTag.getCompound(i)) // Use NbtOps.INSTANCE
+                                .resultOrPartial(LOGGER_WD::error)
+                                .orElse(BlockPos.ZERO)
+                );
+            }
         }
 
-        // this.blockStates_LEGACY.clear();
-        // if (nbt.contains(KEY_WD_BLOCK_STATES_LEGACY, Tag.TAG_LIST)) {
-        //    ListTag listTag = nbt.getList(KEY_WD_BLOCK_STATES_LEGACY, Tag.TAG_COMPOUND);
-        //    for (int i = 0; i < listTag.size(); i++) this.blockStates_LEGACY.add(NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), listTag.getCompound(i)));
-        // }
+        // Load blockStates_LEGACY (if you are keeping it)
+        this.blockStates_LEGACY.clear();
+        if (nbt.contains(KEY_WD_BLOCK_STATES_LEGACY, Tag.TAG_LIST)) {
+            ListTag listTag = nbt.getList(KEY_WD_BLOCK_STATES_LEGACY, Tag.TAG_COMPOUND); // Assuming these are BlockState NBTs directly
+            for (int i = 0; i < listTag.size(); i++) {
+                this.blockStates_LEGACY.add(NbtUtils.readBlockState(blockHolderGetter, listTag.getCompound(i)));
+            }
+        }
 
         LOGGER_WD.debug("WorldData instance loaded from NBT.");
     }
-
 
     /**
      * Record to store saved block data.
      */
     public static record SavedBlock(BlockPos pos, BlockState state, ResourceKey<Level> dimension) {
+        // NBT Keys are static and defined in the outer WorldData class
 
         public CompoundTag toNBT() {
             CompoundTag tag = new CompoundTag();
-            tag.put(KEY_POS, NbtUtils.writeBlockPos(pos));
-            tag.put(KEY_STATE, NbtUtils.writeBlockState(state));
-            tag.putString(KEY_DIMENSION, dimension.location().toString());
+            // KEY_POS is static in WorldData, so WorldData.KEY_POS or just KEY_POS if no ambiguity
+            tag.put(WorldData.KEY_POS, NbtUtils.writeBlockPos(pos));
+            tag.put(WorldData.KEY_STATE, NbtUtils.writeBlockState(state));
+            tag.putString(WorldData.KEY_DIMENSION, dimension.location().toString());
             return tag;
         }
 
         public static SavedBlock fromNBT(CompoundTag tag) {
-            BlockPos pos = NbtUtils.readBlockPos(tag.getCompound(KEY_POS));
-            BlockState state = NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), tag.getCompound(KEY_STATE));
-            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString(KEY_DIMENSION)));
+            BlockPos pos = BlockPos.CODEC.parse(NbtOps.INSTANCE, tag.getCompound(WorldData.KEY_POS))
+                    .resultOrPartial(WorldData.LOGGER_WD::error)
+                    .orElse(BlockPos.ZERO);
+
+            // Explicitly cast BuiltInRegistries.BLOCK to HolderGetter<Block>
+            HolderGetter<Block> blockHolderGetter = (HolderGetter<Block>) BuiltInRegistries.BLOCK;
+            BlockState state = NbtUtils.readBlockState(blockHolderGetter, tag.getCompound(WorldData.KEY_STATE));
+
+            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(tag.getString(WorldData.KEY_DIMENSION)));
             return new SavedBlock(pos, state, dimension);
         }
     }

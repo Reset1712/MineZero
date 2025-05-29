@@ -2,31 +2,33 @@ package boomcow.minezero.input;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
-import net.minecraftforge.client.settings.KeyConflictContext;
+// NeoForge specific imports for keybinding context and modifiers
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
+import net.neoforged.neoforge.common.util.Lazy; // NeoForge's Lazy utility
+
 import org.lwjgl.glfw.GLFW;
 
 public class KeyBindings {
 
     public static final String KEY_CATEGORY_MINEZERO = "key.categories.minezero";
 
-    // Existing Keybind
-    public static final String KEY_EXAMPLE_ACTION = "key.minezero.example_action";
-    public static final KeyMapping EXAMPLE_ACTION_KEY = new KeyMapping(
-            KEY_EXAMPLE_ACTION,
-            KeyConflictContext.IN_GAME,
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_O, // Default: O
-            KEY_CATEGORY_MINEZERO
-    );
+    // Use Lazy for initialization as per NeoForge documentation
+    public static final Lazy<KeyMapping> EXAMPLE_ACTION_KEY = Lazy.of(() -> new KeyMapping(
+            "key.minezero.example_action", // name
+            KeyConflictContext.IN_GAME,    // IKeyConflictContext
+            KeyModifier.NONE,              // KeyModifier
+            InputConstants.Type.KEYSYM,    // Input Type
+            GLFW.GLFW_KEY_O,               // Default Key Code
+            KEY_CATEGORY_MINEZERO          // Category
+    ));
 
-    // --- New Keybind ---
-    public static final String KEY_SELF_DAMAGE = "key.minezero.self_damage";
-    public static final KeyMapping SELF_DAMAGE_KEY = new KeyMapping(
-            KEY_SELF_DAMAGE,
-            KeyConflictContext.IN_GAME, // Only active in game
+    public static final Lazy<KeyMapping> SELF_DAMAGE_KEY = Lazy.of(() -> new KeyMapping(
+            "key.minezero.self_damage",
+            KeyConflictContext.IN_GAME,
+            KeyModifier.NONE,
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_P, // Default: P
+            GLFW.GLFW_KEY_R, // Assuming R is the intended key
             KEY_CATEGORY_MINEZERO
-    );
-    // --- End New Keybind ---
+    ));
 }
