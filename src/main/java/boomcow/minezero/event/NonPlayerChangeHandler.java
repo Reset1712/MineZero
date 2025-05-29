@@ -30,6 +30,11 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class NonPlayerChangeHandler {
 
+    private static WorldData getActiveWorldData(ServerLevel level) {
+        if (level == null || level.getServer() == null) return null;
+        CheckpointData checkpointData = CheckpointData.get(level); // Get the global checkpoint data
+        return checkpointData.getWorldData(); // Get the WorldData instance from it
+    }
 
     @SubscribeEvent
     public static void onFirePlaced(EntityPlaceEvent event) {
@@ -52,6 +57,8 @@ public class NonPlayerChangeHandler {
 //        logger.info("Explosion at: " + event.getExplosion().getPosition());
 
         CheckpointData data = CheckpointData.get(level);
+        WorldData worldDataInstance = getActiveWorldData(level);
+
         long now = level.getGameTime();
         int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
 
@@ -85,12 +92,12 @@ public class NonPlayerChangeHandler {
 
             // Process each block like in player break logic
             for (BlockPos currentPos : affectedPositions) {
-                if (WorldData.modifiedBlocks.contains(currentPos)) {
-                    WorldData.modifiedBlocks.remove(currentPos);
+                if (worldDataInstance.modifiedBlocks.contains(currentPos)) {
+                    worldDataInstance.modifiedBlocks.remove(currentPos);
                 } else {
                     BlockState currentState = level.getBlockState(currentPos);
-                    WorldData.minedBlocks.put(currentPos, currentState);
-                    WorldData.blockDimensionIndices.put(currentPos, dimensionIndex);
+                    worldDataInstance.minedBlocks.put(currentPos, currentState);
+                    worldDataInstance.blockDimensionIndices.put(currentPos, dimensionIndex);
                 }
             }
         }

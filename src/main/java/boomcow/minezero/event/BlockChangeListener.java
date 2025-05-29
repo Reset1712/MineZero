@@ -1,5 +1,6 @@
 package boomcow.minezero.event;
 
+import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.WorldData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,100 +25,85 @@ import java.util.List;
 
 @Mod.EventBusSubscriber
 public class BlockChangeListener {
-
+    private static final Logger LOGGER_BCL = LogManager.getLogger("MineZeroBCL");
+    private static WorldData getActiveWorldData(ServerLevel level) {
+        if (level == null || level.getServer() == null) return null;
+        CheckpointData checkpointData = CheckpointData.get(level); // Get the global checkpoint data
+        return checkpointData.getWorldData(); // Get the WorldData instance from it
+    }
 
     // 1. Solid block placement
     @SubscribeEvent
     public static void onSolidBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            BlockState newState = event.getState();
-            Logger logger = LogManager.getLogger();
-            BlockPos pos = event.getPos();
             ServerLevel level = (ServerLevel) player.level();
-            int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
+            WorldData worldDataInstance = getActiveWorldData(level); // Get the instance
 
-            // Skip liquid placements
-            if (newState.getBlock() instanceof LiquidBlock) return;
-
-            // Special case: Eye added to End Portal Frame
-            if (newState.getBlock() == Blocks.END_PORTAL_FRAME && newState.getValue(EndPortalFrameBlock.HAS_EYE)) {
-                WorldData.addedEyes.add(pos);
+            if (worldDataInstance == null) {
+                LOGGER_BCL.warn("Could not get active WorldData for block placement tracking.");
                 return;
             }
 
-            // Regular block placement
-            logger.info("Block placed at: " + pos);
-            WorldData.modifiedBlocks.add(pos);
-            WorldData.blockDimensionIndices.put(pos, dimensionIndex);
+            BlockState newState = event.getState();
+            BlockPos pos = event.getPos().immutable(); // Ensure immutable
+            // int dimensionIndex = WorldData.getGlobalDimensionId(level.dimension()); // Use static utility if needed globally
+
+            if (newState.getBlock() instanceof LiquidBlock) return;
+
+            if (newState.getBlock() == Blocks.END_PORTAL_FRAME && newState.getValue(EndPortalFrameBlock.HAS_EYE)) {
+                worldDataInstance.getAddedEyes().add(pos); // Access via instance
+                return;
+            }
+
+            LOGGER_BCL.info("Block placed at: " + pos + " tracking in instance WorldData.");
+            worldDataInstance.getModifiedBlocks().add(pos); // Access via instance
+            worldDataInstance.getInstanceBlockDimensionIndices().put(pos, WorldData.getDimensionIndex(level.dimension())); // Access via instance
         }
     }
 
     // 2. Solid block break
     @SubscribeEvent
     public static void onSolidBlockBreak(BlockEvent.BreakEvent event) {
-        Logger logger = LogManager.getLogger();
         if (event.getPlayer() instanceof ServerPlayer player) {
-            BlockState state = event.getState();
-            // Only handle non-fluid breaks.
-            if (!(state.getBlock() instanceof LiquidBlock)) {
-                ServerLevel level = (ServerLevel) player.level();
-                int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
+            ServerLevel level = (ServerLevel) player.level();
+            WorldData worldDataInstance = getActiveWorldData(level); // Get the instance
 
-                // Create a list to hold the positions of the block being broken and its related parts.
+            if (worldDataInstance == null) {
+                LOGGER_BCL.warn("Could not get active WorldData for block break tracking.");
+                return;
+            }
+
+            BlockState state = event.getState();
+            if (!(state.getBlock() instanceof LiquidBlock)) {
+                // int dimensionIndex = WorldData.getGlobalDimensionId(level.dimension());
+
                 List<BlockPos> brokenBlockPositions = new ArrayList<>();
-                BlockPos pos = event.getPos();
+                BlockPos pos = event.getPos().immutable();
                 brokenBlockPositions.add(pos);
                 Block block = state.getBlock();
 
-                // Check if the block is part of a multiblock structure.
-                // For doors (which consist of an upper and lower half):
                 if (block instanceof DoorBlock) {
-                    // DoorBlock uses the "HALF" property from DoubleBlockHalf (LOWER/UPPER)
                     if (state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER) {
-                        // If this is the lower half, add the block above (upper half).
                         brokenBlockPositions.add(pos.above());
                     } else {
-                        // If this is the upper half, add the block below (lower half).
                         brokenBlockPositions.add(pos.below());
                     }
-                }
-                // For beds (which have a head and a foot):
-                else if (block instanceof BedBlock) {
-                    // BedBlock uses the "PART" property (HEAD/FOOT) and the "FACING" property to determine layout.
+                } else if (block instanceof BedBlock) {
                     Direction facing = state.getValue(BedBlock.FACING);
                     if (state.getValue(BedBlock.PART) == BedPart.FOOT) {
-                        // If this is the foot, then the head is in the facing direction.
                         brokenBlockPositions.add(pos.relative(facing));
                     } else {
-                        // If this is the head, the foot is in the opposite direction.
                         brokenBlockPositions.add(pos.relative(facing.getOpposite()));
                     }
                 }
 
-                // Process each block position (the original block and any additional parts).
                 for (BlockPos currentPos : brokenBlockPositions) {
-                    if (WorldData.modifiedBlocks.contains(currentPos)) {
-                        // If the block was placed after the checkpoint, remove it from the modified set.
-                        WorldData.modifiedBlocks.remove(currentPos);
+                    if (worldDataInstance.getModifiedBlocks().contains(currentPos)) { // Access via instance
+                        worldDataInstance.getModifiedBlocks().remove(currentPos); // Access via instance
                     } else {
-                        // Otherwise, record the block break normally.
-                        // Get the current state at that position from the level.
-                        BlockState currentState = level.getBlockState(currentPos);
-                        WorldData.minedBlocks.put(currentPos, currentState);
-                        WorldData.blockDimensionIndices.put(currentPos, dimensionIndex);
-                    }
-
-                    BlockState brokenState = level.getBlockState(currentPos);
-                    if (brokenState.getBlock() == Blocks.OBSIDIAN) {
-                        for (Direction dir : Direction.values()) {
-                            BlockPos neighbor = currentPos.relative(dir);
-                            BlockState neighborState = level.getBlockState(neighbor);
-                            if (neighborState.getBlock() == Blocks.NETHER_PORTAL) {
-                                WorldData.destroyedPortals.put(neighbor.immutable(), neighborState);
-                                WorldData.blockDimensionIndices.put(neighbor.immutable(), dimensionIndex);
-                                WorldData.createdPortals.remove(neighbor.immutable());
-                            }
-                        }
+                        BlockState currentState = level.getBlockState(currentPos); // Get fresh state
+                        worldDataInstance.getMinedBlocks().put(currentPos, currentState); // Access via instance
+                        worldDataInstance.getInstanceBlockDimensionIndices().put(currentPos, WorldData.getDimensionIndex(level.dimension())); // Access via instance
                     }
                 }
             }
@@ -131,39 +117,63 @@ public class BlockChangeListener {
 
     @SubscribeEvent
     public static void onBucketRightClick(PlayerInteractEvent.RightClickBlock event) {
-        // Use getEntity() instead of getPlayer()
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        Logger logger = LogManager.getLogger();
+
+        ServerLevel level = (ServerLevel) event.getLevel(); // Use event.getLevel()
+        WorldData worldDataInstance = getActiveWorldData(level); // Get the instance
+
+        if (worldDataInstance == null) {
+            LOGGER_BCL.warn("Could not get active WorldData for bucket interaction tracking.");
+            return;
+        }
+
         ItemStack stack = event.getItemStack();
         if (stack.getItem() instanceof BucketItem bucketItem) {
-            ServerLevel level = (ServerLevel) event.getLevel();
-            int dimensionIndex = WorldData.getDimensionIndex(level.dimension());
+            // int dimensionIndex = WorldData.getGlobalDimensionId(level.dimension());
+            BlockPos clickedPos = event.getPos().immutable(); // The block that was clicked
+            BlockPos targetPos = clickedPos.relative(event.getFace()).immutable(); // The block where fluid might be placed/removed
 
-            // Check if the bucket contains a fluid (for placement)
-            if (bucketItem.getFluid() == Fluids.LAVA || bucketItem.getFluid() == Fluids.WATER) {
-                // Fluid will be placed at the adjacent block in the direction of the clicked face.
-                BlockPos targetPos = event.getPos().relative(event.getFace());
-                WorldData.modifiedFluidBlocks.add(targetPos);
-                WorldData.blockDimensionIndices.put(targetPos, dimensionIndex);
-            }
-            // Otherwise, if the bucket is empty, check if we are picking up a fluid.
-            else if (bucketItem.getFluid() == Fluids.EMPTY) {
-                // For fluid pickup, check the clicked block.
+            if (bucketItem.getFluid() == Fluids.LAVA || bucketItem.getFluid() == Fluids.WATER) { // Placing fluid
+                worldDataInstance.getModifiedFluidBlocks().add(targetPos); // Access via instance
+                worldDataInstance.getInstanceBlockDimensionIndices().put(targetPos, WorldData.getDimensionIndex(level.dimension()));// Access via instance
+                LOGGER_BCL.info("Fluid placed at: " + targetPos + " tracking in instance WorldData.");
+            } else if (bucketItem.getFluid() == Fluids.EMPTY) { // Picking up fluid
+                // When picking up, the fluid is AT the clickedPos (if it's a source block)
+                // or at targetPos if you clicked an adjacent solid block.
+                // Minecraft's BucketItem logic targets the block clicked OR the space next to it.
+                // Let's check the block directly clicked first, then the adjacent one if the clicked one isn't fluid.
+                BlockState fluidStateSource = level.getBlockState(clickedPos);
+                BlockPos actualFluidPos = null;
 
-                BlockPos targetPos = event.getPos().relative(event.getFace());
-                BlockState state = level.getBlockState(targetPos);
-                // Check if the fluid state of the block is either water or lava.
-                if (state.getFluidState().is(Fluids.WATER) || state.getFluidState().is(Fluids.LAVA)) {
-                    if (WorldData.modifiedFluidBlocks.contains(targetPos)) {
-                        WorldData.modifiedFluidBlocks.remove(targetPos);
-                    } else {
-                        // Record this fluid pickup as a mined fluid block.
-                        WorldData.minedFluidBlocks.put(targetPos, state);
-                        WorldData.blockDimensionIndices.put(targetPos, dimensionIndex);
+                if (fluidStateSource.getFluidState().isSourceOfType(Fluids.WATER) || fluidStateSource.getFluidState().isSourceOfType(Fluids.LAVA)) {
+                    actualFluidPos = clickedPos;
+                } else {
+                    // If clicked block is not a fluid source, check the adjacent block where fluid would be placed from an empty bucket
+                    // This logic might need refinement based on vanilla bucket behavior.
+                    // Vanilla bucket pickup primarily targets the block *at* event.getPos()
+                    BlockState adjacentState = level.getBlockState(targetPos);
+                    if (adjacentState.getFluidState().isSourceOfType(Fluids.WATER) || adjacentState.getFluidState().isSourceOfType(Fluids.LAVA)) {
+                        actualFluidPos = targetPos;
                     }
+                }
+
+                // If we are trying to pick up from event.getPos() directly
+                if(actualFluidPos == null && (level.getBlockState(event.getPos()).getFluidState().is(Fluids.WATER) || level.getBlockState(event.getPos()).getFluidState().is(Fluids.LAVA))){
+                    actualFluidPos = event.getPos();
+                }
+
+
+                if (actualFluidPos != null) {
+                    BlockState stateToMine = level.getBlockState(actualFluidPos); // Get the actual state
+                    if (worldDataInstance.getModifiedFluidBlocks().contains(actualFluidPos)) { // Access via instance
+                        worldDataInstance.getModifiedFluidBlocks().remove(actualFluidPos); // Access via instance
+                    } else {
+                        worldDataInstance.getMinedFluidBlocks().put(actualFluidPos, stateToMine); // Access via instance
+                        worldDataInstance.getInstanceBlockDimensionIndices().put(actualFluidPos, WorldData.getDimensionIndex(level.dimension())); // Access via instance
+                    }
+                    LOGGER_BCL.info("Fluid picked up from: " + actualFluidPos + " tracking in instance WorldData.");
                 }
             }
         }
     }
-
 }

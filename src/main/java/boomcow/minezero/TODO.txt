@@ -1,5 +1,5 @@
-- TODO add special case for inserting ender eyes
-- TODO check if portal formed and add portal block to modified blocks
+X TODO add special case for inserting ender eyes
+X TODO check if portal formed and add portal block to modified blocks
 X Track block entities again
     X across dimensions
     X furnace stays on after being reset
@@ -26,3 +26,7 @@ X track weather
     X track lighting
 - durability not saved (?)
 X fixed fire tick double death bug
+
+- ADD SELF DAMAGE KNIFE
+- SAVE CHECKPOINT WHEN LEAVING WORLD
+- SET CHECKPOINT ON WORLD CREATION

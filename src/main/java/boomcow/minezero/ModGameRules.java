@@ -28,4 +28,8 @@ public class ModGameRules {
     // Duration in seconds for the cooldown.
     public static final GameRules.Key<IntegerValue> FLUTE_COOLDOWN_DURATION =
             GameRules.register("fluteCooldownDuration", GameRules.Category.PLAYER, GameRules.IntegerValue.create(60));
+
+    // New gamerule to enable/disable the Artifact Flute entirely
+    public static final GameRules.Key<BooleanValue> ARTIFACT_FLUTE_ENABLED =
+            GameRules.register("artifactFluteEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
 }

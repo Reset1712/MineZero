@@ -1,11 +1,18 @@
 package boomcow.minezero;
 
+import boomcow.minezero.checkpoint.CheckpointData;
+import boomcow.minezero.checkpoint.CheckpointManager;
 import boomcow.minezero.command.SetCheckPointCommand;
 import boomcow.minezero.command.SetSubaruPlayer;
+import boomcow.minezero.command.TriggerRBD;
 import boomcow.minezero.event.DeathEventHandler;
+import boomcow.minezero.input.KeyBindings;
 import boomcow.minezero.items.ArtifactFluteItem;
+import boomcow.minezero.network.PacketHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
@@ -13,9 +20,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -30,7 +39,6 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
-
 
 
 @Mod(MineZero.MODID)
@@ -60,6 +68,7 @@ public class MineZero {
         // Register event listeners and Deferred Registers
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
+        modEventBus.addListener(this::setupNetworking);
 
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
@@ -67,6 +76,8 @@ public class MineZero {
         // Register event handlers
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new DeathEventHandler());
+
+
 
 
         ModSoundEvents.register(FMLJavaModLoadingContext.get().getModEventBus());
@@ -77,6 +88,7 @@ public class MineZero {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         SetCheckPointCommand.register(event.getDispatcher());
         SetSubaruPlayer.register(event.getDispatcher());
+        TriggerRBD.register(event.getDispatcher());
     }
 
 
@@ -97,6 +109,12 @@ public class MineZero {
         }
     }
 
+    private void setupNetworking(final FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> { // Use enqueueWork for thread safety during setup
+            PacketHandler.register();
+        });
+    }
+
     @SubscribeEvent
     public static void onLoad(final ModConfigEvent.Loading configEvent) {
         LOGGER.info("Loading MineZero config");
@@ -110,6 +128,28 @@ public class MineZero {
     }
 
     @SubscribeEvent
+    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        LOGGER.info("PlayerLoggedIn MineZero config");
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.level().isClientSide()) return;
+
+        ServerLevel level = (ServerLevel) player.level();
+        CheckpointData data = CheckpointData.get(level);
+
+        // DEBUG: log both the current player UUID and the stored anchor
+        LOGGER.info("[MineZero][LOGIN] Player UUID = {}, Stored Anchor = {}",
+                player.getUUID(), data.getAnchorPlayerUUID());
+
+        if (data.getAnchorPlayerUUID() == null) {
+            data.setAnchorPlayerUUID(player.getUUID());
+            data.setDirty();
+            CheckpointManager.setCheckpoint(player);
+            LOGGER.info("[MineZero] 🎯 Anchor set to {}", player.getUUID());
+        }
+    }
+
+
+    @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("HELLO from server starting");
     }
@@ -121,6 +161,15 @@ public class MineZero {
         public static void onClientSetup(FMLClientSetupEvent event) {
             LOGGER.info("HELLO FROM CLIENT SETUP");
             LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+
+        }
+
+        @SubscribeEvent
+        public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
+            LOGGER.info("Registering MineZero Key Mappings");
+            event.register(KeyBindings.EXAMPLE_ACTION_KEY);
+            event.register(KeyBindings.SELF_DAMAGE_KEY);
+            // Register other keybindings here if you add more
         }
     }
 }

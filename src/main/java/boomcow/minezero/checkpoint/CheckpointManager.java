@@ -278,8 +278,8 @@ public class CheckpointManager {
 
 
             // Restore only modified blocks to air in the correct dimensions
-            for (BlockPos pos : WorldData.modifiedBlocks) {
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+            for (BlockPos pos : worldData.modifiedBlocks) {
+                int dimIndex = worldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
 
                 if (dimLevel != null) {
@@ -291,10 +291,10 @@ public class CheckpointManager {
             }
 
             // Restore mined blocks in the correct dimensions
-            for (Map.Entry<BlockPos, BlockState> entry : WorldData.minedBlocks.entrySet()) {
+            for (Map.Entry<BlockPos, BlockState> entry : worldData.minedBlocks.entrySet()) {
                 BlockPos pos = entry.getKey();
                 BlockState originalState = entry.getValue();
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                int dimIndex = worldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
 
                 if (dimLevel != null) {
@@ -309,17 +309,17 @@ public class CheckpointManager {
 
             // Restore modified fluid blocks to air in the correct dimensions
 
-            for (BlockPos pos : WorldData.modifiedFluidBlocks) {
+            for (BlockPos pos : worldData.modifiedFluidBlocks) {
 
 
-                if (!WorldData.blockDimensionIndices.containsKey(pos)) {
+                if (!worldData.blockDimensionIndices.containsKey(pos)) {
                     logger.info("No dimension index for modified fluid block at " + pos);
                     continue;
                 }
 
                 logger.debug("Restoring fluid block at " + pos);
 
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                int dimIndex = worldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
                     BlockState currentState = dimLevel.getBlockState(pos);
@@ -331,16 +331,16 @@ public class CheckpointManager {
             }
 
 // Restore mined fluid blocks (i.e. fluid that was removed) in the correct dimensions
-            for (Map.Entry<BlockPos, BlockState> entry : WorldData.minedFluidBlocks.entrySet()) {
+            for (Map.Entry<BlockPos, BlockState> entry : worldData.minedFluidBlocks.entrySet()) {
                 BlockPos pos = entry.getKey();
                 BlockState originalState = entry.getValue();
 
-                if (!WorldData.blockDimensionIndices.containsKey(pos)) {
+                if (!worldData.blockDimensionIndices.containsKey(pos)) {
                     logger.info("No dimension index for modified fluid block at " + pos);
                     continue;
                 }
 
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                int dimIndex = worldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
                     BlockState currentState = dimLevel.getBlockState(pos);
@@ -383,7 +383,7 @@ public class CheckpointManager {
             // Restore block entities in the correct dimensions
             for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
                 BlockPos pos = entry.getKey();
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
+                int dimIndex = worldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
 
                 if (dimLevel != null) {
@@ -566,7 +566,7 @@ public class CheckpointManager {
                 }
             }
 
-            for (BlockPos eyePos : WorldData.addedEyes) {
+            for (BlockPos eyePos : worldData.addedEyes) {
                 BlockState state = level.getBlockState(eyePos);
                 if (state.getBlock() == Blocks.END_PORTAL_FRAME && state.getValue(EndPortalFrameBlock.HAS_EYE)) {
                     level.setBlock(eyePos, state.setValue(EndPortalFrameBlock.HAS_EYE, false), 3);
@@ -577,42 +577,8 @@ public class CheckpointManager {
 
 
 
-            for (BlockPos originalPos : new ArrayList<>(WorldData.destroyedPortals.keySet())) {
-                int dimIndex = WorldData.blockDimensionIndices.get(originalPos);
-                ResourceKey<Level> dimension = WorldData.getDimensionFromIndex(dimIndex);
-                ServerLevel dim = level.getServer().getLevel(dimension);
 
-                if (dim != null) {
-                    BlockPos pos = originalPos;
 
-                    // Go downward until we find a solid block (usually the obsidian base)
-                    while (dim.getBlockState(pos.below()).isAir() && pos.getY() > dim.getMinBuildHeight()) {
-                        pos = pos.below();
-                    }
-
-                    BlockState below = dim.getBlockState(pos.below());
-                    BlockState current = dim.getBlockState(pos);
-
-                    if (current.isAir() && below.getBlock() == Blocks.OBSIDIAN) {
-                        // Place fire to trigger portal re-lighting
-                        dim.setBlockAndUpdate(pos, Blocks.FIRE.defaultBlockState());
-                    }
-                }
-            }
-            WorldData.destroyedPortals.clear();
-
-            for (BlockPos pos : WorldData.createdPortals) {
-                int dimIndex = WorldData.blockDimensionIndices.get(pos);
-                ResourceKey<Level> dimension = WorldData.getDimensionFromIndex(dimIndex);
-                ServerLevel dim = level.getServer().getLevel(dimension);
-                if (dim != null) {
-                    BlockState currentState = dim.getBlockState(pos);
-                    if (currentState.getBlock() == Blocks.NETHER_PORTAL) {
-                        dim.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
-                    }
-                }
-            }
-            WorldData.createdPortals.clear();
 
             List<WorldData.LightningStrike> strikes = worldData.getSavedLightnings();
             for (WorldData.LightningStrike strike : strikes) {

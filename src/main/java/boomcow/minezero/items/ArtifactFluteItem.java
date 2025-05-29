@@ -21,6 +21,12 @@ public class ArtifactFluteItem extends Item {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        if (!level.getGameRules().getBoolean(ModGameRules.ARTIFACT_FLUTE_ENABLED)) {
+            if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.displayClientMessage(Component.literal("The Artifact Flute is currently disabled by a game rule."), false); // Use false for chat, true for action bar
+            }
+            return InteractionResultHolder.fail(player.getItemInHand(hand));
+        }
         if (!level.isClientSide) {
             if (player instanceof ServerPlayer serverPlayer) {
                 // Check if the flute cooldown gamerule is enabled.
