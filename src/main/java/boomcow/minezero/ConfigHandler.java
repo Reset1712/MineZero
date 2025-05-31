@@ -1,97 +1,140 @@
-package boomcow.minezero;
+package boomcow.minezero.config; // Or boomcow.minezero.ConfigHandler
 
-// Old Forge imports:
-// import net.minecraftforge.common.ForgeConfigSpec;
-// import net.minecraftforge.fml.config.ModConfig;
+import boomcow.minezero.MineZeroMain;
+import me.shedaniel.autoconfig.AutoConfig;
+import me.shedaniel.autoconfig.ConfigData;
+import me.shedaniel.autoconfig.annotation.Config;
+import me.shedaniel.autoconfig.annotation.ConfigEntry;
+import me.shedaniel.autoconfig.serializer.GsonConfigSerializer; // Or Toml4jConfigSerializer
+import me.shedaniel.clothconfig2.api.ConfigBuilder;
+import me.shedaniel.clothconfig2.api.ConfigCategory;
+import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import net.minecraft.client.gui.screen.Screen; // For the config screen parent
+import net.minecraft.text.Text; // For translatable text in UI
 
-// NeoForge imports:
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import net.neoforged.fml.event.config.ModConfigEvent;
-import net.neoforged.neoforge.common.ModConfigSpec;
-import org.apache.commons.lang3.tuple.Pair;
-// No need for MineZero import here usually, unless you were calling a static logger from MineZero
-// import boomcow.minezero.MineZero; // Not strictly needed here, but MineZero.LOGGER might be used in events
+import java.util.Arrays;
+import java.util.List;
 
-public class ConfigHandler {
+// Define a class that holds your config values (this replaces your static COMMON object)
+// The @Config annotation links this class to AutoConfig
+@Config(name = MineZeroMain.MOD_ID) // This will result in a file like "config/minezero.json"
+public class ConfigHandler implements ConfigData {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MineZeroMain.MOD_ID + "-config");
 
-    // It's good practice to name the Spec object clearly as the "Spec"
-    public static final ModConfigSpec COMMON_CONFIG_SPEC;
-    public static final CommonConfig COMMON;
+    // AutoConfig will automatically populate these fields from the config file.
+    // @ConfigEntry.Gui.Excluded // Use this if you don't want a field to appear in the GUI but still be in the file
+    // @ConfigEntry.Category("general") // (Optional) Define categories for GUI, though often done in screen builder
 
-    static {
-        // The Builder pattern should be identical
-        Pair<CommonConfig, ModConfigSpec> commonPair = new ModConfigSpec.Builder().configure(CommonConfig::new);
-        COMMON_CONFIG_SPEC = commonPair.getRight();
-        COMMON = commonPair.getLeft();
+    @ConfigEntry.Gui.Tooltip // Adds a tooltip in the config screen
+    public String deathChime = "CLASSIC"; // Default value
+
+    // Example of another option
+    // @ConfigEntry.Gui.Tooltip
+    // public boolean exampleBoolean = true;
+
+    // --- Transient fields are not saved to config, used for logic if needed ---
+    // transient boolean someLogicFlag = false;
+
+
+    // --- Static methods to access config values ---
+    // This instance will be managed by AutoConfig
+    private static ConfigHandler INSTANCE = null;
+
+    public static void register() {
+        // Register the config class with AutoConfig.
+        // This will load the config from file or create it with defaults,
+        // and make it available via AutoConfig.getConfigHolder(ConfigHandler.class).getConfig()
+        AutoConfig.register(ConfigHandler.class, GsonConfigSerializer::new); // Or Toml4jConfigSerializer::new for TOML
+
+        // Get the initial instance
+        INSTANCE = AutoConfig.getConfigHolder(ConfigHandler.class).getConfig();
+        LOGGER.info("MineZero config loaded/initialized with Cloth Config.");
+
+        // You can listen to save events if needed
+        AutoConfig.getConfigHolder(ConfigHandler.class).registerSaveListener((manager, data) -> {
+            LOGGER.info("MineZero config saved!");
+            INSTANCE = data; // Update our cached instance
+            // Perform actions on save if needed
+            return me.shedaniel.clothconfig2.api. திரும்பு.SUCCESS; // Typo in original Cloth, should be SaveAction.SUCCESS or similar
+        });
     }
 
-    public static class CommonConfig {
-        // ConfigValue type should come from the NeoForge ModConfigSpec
-        public final ModConfigSpec.ConfigValue<String> deathChime;
-        // public final ModConfigSpec.BooleanValue myExampleBool; // Example
+    // Public static getter for the config instance
+    public static ConfigHandler get() {
+        if (INSTANCE == null) {
+            // This should ideally not happen if register() is called correctly during init
+            // but as a fallback, try to get it from AutoConfig
+            LOGGER.warn("ConfigHandler.INSTANCE was null, attempting to retrieve from AutoConfig. Ensure register() is called.");
+            INSTANCE = AutoConfig.getConfigHolder(ConfigHandler.class).getConfig();
+        }
+        return INSTANCE;
+    }
 
-        public CommonConfig(ModConfigSpec.Builder builder) {
-            builder.comment("General settings").push("general");
+    // Static getter for specific values (convenience)
+    public static String getDeathChimeOption() {
+        return get().deathChime;
+    }
 
-            deathChime = builder
-                    .comment("Death Chime Options: CLASSIC, ALTERNATE. Default: CLASSIC")
-                    .define("deathChime", "CLASSIC"); // .defineInRange, .defineList etc. for other types
+    // --- Cloth Config Screen Builder (for ModMenuIntegration) ---
+    public static Screen getClothConfigScreen(Screen parentScreen) {
+        ConfigBuilder builder = ConfigBuilder.create()
+                .setParentScreen(parentScreen)
+                .setTitle(Text.translatable("config." + MineZeroMain.MOD_ID + ".title")); // e.g., "MineZero Configuration"
 
-            // Example:
-            // myExampleBool = builder
-            //        .comment("An example boolean config option.")
-            //        .define("exampleBoolean", true);
+        // Save callback: when "Save" is clicked in the GUI
+        builder.setSavingRunnable(() -> {
+            // AutoConfig handles the actual saving when its holder is saved.
+            // We just need to trigger AutoConfig's save.
+            AutoConfig.getConfigHolder(ConfigHandler.class).save();
+        });
 
-            builder.pop(); // Pop "general"
+        ConfigCategory general = builder.getOrCreateCategory(Text.translatable("config." + MineZeroMain.MOD_ID + ".category.general"));
 
-            // If you have checkpoint settings, define them here:
-            // builder.comment("Checkpoint settings").push("checkpoints");
-            // exampleCheckpointSetting = builder.define("exampleCheckpoint", 100);
-            // builder.pop(); // Pop "checkpoints"
+        ConfigEntryBuilder entryBuilder = builder.entryBuilder();
+
+        // Death Chime Option (Dropdown/String List)
+        List<String> deathChimeOptions = Arrays.asList("CLASSIC", "ALTERNATE");
+        general.addEntry(entryBuilder.startSelector(
+                                Text.translatable("config." + MineZeroMain.MOD_ID + ".option.deathChime"),
+                                deathChimeOptions.toArray(new String[0]), // Options
+                                get().deathChime // Current value
+                        )
+                        .setDefaultValue("CLASSIC") // Default value for the GUI
+                        .setTooltip(Text.translatable("config." + MineZeroMain.MOD_ID + ".option.deathChime.tooltip"))
+                        .setSaveConsumer(newValue -> get().deathChime = newValue) // When value changes in GUI
+                        .build()
+        );
+
+        // Example Boolean:
+        /*
+        general.addEntry(entryBuilder.startBooleanToggle(
+                                Text.translatable("config." + MineZeroMain.MOD_ID + ".option.exampleBoolean"),
+                                get().exampleBoolean
+                        )
+                        .setDefaultValue(true)
+                        .setTooltip(Text.translatable("config." + MineZeroMain.MOD_ID + ".option.exampleBoolean.tooltip"))
+                        .setSaveConsumer(newValue -> get().exampleBoolean = newValue)
+                        .build()
+        );
+        */
+
+        return builder.build();
+    }
+
+    // --- Optional: Validation (called by AutoConfig after loading data) ---
+    @Override
+    public void validatePostLoad() throws ConfigData.ValidationException {
+        ConfigData.super.validatePostLoad(); // Default validation
+        // Add custom validation if needed
+        List<String> validChimes = Arrays.asList("CLASSIC", "ALTERNATE");
+        if (!validChimes.contains(deathChime)) {
+            LOGGER.warn("Invalid deathChime value '{}' found in config, resetting to default 'CLASSIC'.", deathChime);
+            deathChime = "CLASSIC";
+            // Note: To make this change persist, you'd ideally trigger a save of the config.
+            // AutoConfig.getConfigHolder(ConfigHandler.class).save(); // Be careful with recursive saves
         }
     }
-
-    // Method to get the death chime setting
-    public static String getDeathChime() {
-        // It's good practice to check for null in case the config isn't loaded yet,
-        // though FML usually ensures COMMON and its values are available after config load.
-        if (COMMON != null && COMMON.deathChime != null) {
-            return COMMON.deathChime.get();
-        }
-        return "CLASSIC"; // Fallback default if something goes wrong
-    }
-
-    // These event handlers are registered in MineZero.java to the modEventBus
-    // They need to be static to be registered with Class::method syntax.
-    public static void onLoad(final ModConfigEvent.Loading event) {
-        // This method is called when your config file is loaded from disk.
-        // The values in your COMMON object are automatically populated by FML.
-        // You generally don't need to do anything here unless you want to:
-        // 1. Log that the config loaded.
-        // 2. Cache config values in other static fields (though direct access via COMMON.value.get() is often fine).
-        // 3. Perform actions based on the initial config values.
-        // For example, using the static logger from MineZero if it were public, or a local one:
-        // MineZero.LOGGER.info("MineZero Common Config Loaded: " + event.getConfig().getFileName());
-        System.out.println("MineZero Common Config Loaded: " + event.getConfig().getFileName()); // Simple stdout for now
-    }
-
-    public static void onReload(final ModConfigEvent.Reloading event) {
-        // This method is called when your config file is reloaded (e.g., via /reload command if supported for your config type).
-        // Similar to onLoad, values in COMMON are updated.
-        // React here if game behavior needs to change immediately based on new config values.
-        // MineZero.LOGGER.info("MineZero Common Config Reloaded: " + event.getConfig().getFileName());
-        System.out.println("MineZero Common Config Reloaded: " + event.getConfig().getFileName());
-    }
-
-
-    // The old `loadConfig(ModConfig config)` method is generally not needed.
-    // FML handles the process of loading the values from the file into your ModConfigSpec.ConfigValue objects.
-    // The ModConfigEvent.Loading and ModConfigEvent.Reloading events are your hooks to react to these actions.
-    /*
-    public static void loadConfig(ModConfig config) {
-        // This method (as you had it) isn't typically used for applying the config values.
-        // That's done automatically by FML when it loads the ModConfig.
-        // You'd use this if you were manually parsing a different config format, which isn't the case here.
-    }
-    */
 }

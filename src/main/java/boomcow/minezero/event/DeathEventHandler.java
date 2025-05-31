@@ -1,7 +1,7 @@
 package boomcow.minezero.event;
 
 import boomcow.minezero.ConfigHandler;
-import boomcow.minezero.MineZero;
+import boomcow.minezero.MineZeroMain;
 import boomcow.minezero.ModSoundEvents;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
@@ -82,7 +82,7 @@ public class DeathEventHandler {
 
         // --- CORRECTED ResourceLocation ---
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "death_chime"), // Use static factory method
+                ResourceLocation.fromNamespaceAndPath(MineZeroMain.MODID, "death_chime"), // Use static factory method
                 SoundSource.PLAYERS
         );
         // --- End Correction ---
@@ -99,7 +99,7 @@ public class DeathEventHandler {
 
         // --- CORRECTED ResourceLocation ---
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "alt_death_chime"), // Use static factory method
+                ResourceLocation.fromNamespaceAndPath(MineZeroMain.MODID, "alt_death_chime"), // Use static factory method
                 SoundSource.PLAYERS
         );
         // --- End Correction ---

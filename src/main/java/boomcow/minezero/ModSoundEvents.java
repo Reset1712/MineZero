@@ -1,34 +1,36 @@
-package boomcow.minezero;
+package boomcow.minezero; // Your package
 
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.registry.Registries; // Yarn mapping for the RegistryKey container
+import net.minecraft.registry.Registry;    // Yarn mapping for the Registry class itself
+import net.minecraft.sound.SoundEvent;    // Yarn mapping
+import net.minecraft.util.Identifier;     // Yarn mapping
 
 public class ModSoundEvents {
 
-    public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
-            DeferredRegister.create(Registries.SOUND_EVENT, MineZero.MODID);
+    // --- Define Identifiers for your sounds ---
+    public static final Identifier DEATH_CHIME_ID = Identifier.of(MineZeroMain.MOD_ID, "death_chime");
+    public static final Identifier ALT_DEATH_CHIME_ID = Identifier.of(MineZeroMain.MOD_ID, "alt_death_chime");
+    public static final Identifier EMPTY_SOUND_ID = Identifier.of(MineZeroMain.MOD_ID, "empty_sound");
+    public static final Identifier FLUTE_CHIME_ID = Identifier.of(MineZeroMain.MOD_ID, "flute_chime");
 
-    // Use ResourceLocation.fromNamespaceAndPath(namespace, path)
-    public static final DeferredHolder<SoundEvent, SoundEvent> DEATH_CHIME = SOUND_EVENTS.register("death_chime",
-            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "death_chime")));
+    // --- Create SoundEvent instances ---
+    // SoundEvent.of(Identifier) is the direct equivalent for creating a basic sound event.
+    // The "variableRange" aspect is primarily controlled by your sounds.json definitions.
+    public static final SoundEvent DEATH_CHIME = SoundEvent.of(DEATH_CHIME_ID);
+    public static final SoundEvent ALT_DEATH_CHIME = SoundEvent.of(ALT_DEATH_CHIME_ID);
+    public static final SoundEvent EMPTY_SOUND = SoundEvent.of(EMPTY_SOUND_ID);
+    public static final SoundEvent FLUTE_CHIME = SoundEvent.of(FLUTE_CHIME_ID);
 
-    public static final DeferredHolder<SoundEvent, SoundEvent> ALT_DEATH_CHIME = SOUND_EVENTS.register("alt_death_chime",
-            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "alt_death_chime")));
+    /**
+     * Registers the sound events with Minecraft's sound event registry.
+     * This method should be called once during your mod's initialization (e.g., in onInitialize).
+     */
+    public static void registerSoundEvents() {
+        Registry.register(Registries.SOUND_EVENT, DEATH_CHIME_ID, DEATH_CHIME);
+        Registry.register(Registries.SOUND_EVENT, ALT_DEATH_CHIME_ID, ALT_DEATH_CHIME);
+        Registry.register(Registries.SOUND_EVENT, EMPTY_SOUND_ID, EMPTY_SOUND);
+        Registry.register(Registries.SOUND_EVENT, FLUTE_CHIME_ID, FLUTE_CHIME);
 
-    public static final DeferredHolder<SoundEvent, SoundEvent> EMPTY_SOUND = SOUND_EVENTS.register("empty_sound",
-            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "empty_sound")));
-
-    public static final DeferredHolder<SoundEvent, SoundEvent> FLUTE_CHIME = SOUND_EVENTS.register("flute_chime",
-            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "flute_chime")));
-
-    // As mentioned, this static register method is likely redundant if
-    // ModSoundEvents.SOUND_EVENTS.register(modEventBus); is called in MineZero's constructor.
-    /*
-    public static void register(IEventBus eventBus) {
-        SOUND_EVENTS.register(eventBus);
+        MineZeroMain.LOGGER.info("MineZero sound events registered.");
     }
-    */
 }

@@ -1,35 +1,88 @@
-package boomcow.minezero;
+package boomcow.minezero; // Your package
 
-import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.GameRules.BooleanValue;
-import net.minecraft.world.level.GameRules.IntegerValue;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.GameRules.BooleanRule;
+import net.minecraft.world.GameRules.Category;
+import net.minecraft.world.GameRules.IntRule;
+import net.minecraft.world.GameRules.Key;
 
 public class ModGameRules {
 
-    public static final GameRules.Key<BooleanValue> AUTO_CHECKPOINT_ENABLED =
-            GameRules.register("autoCheckpointEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+    // --- Auto Checkpoint Rules ---
+    public static final Key<BooleanRule> AUTO_CHECKPOINT_ENABLED =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "autoCheckpointEnabled").toString(), // Game rule names are strings
+                    Category.PLAYER,
+                    GameRuleFactory.createBooleanRule(true) // Default value
+            );
 
-    public static final GameRules.Key<IntegerValue> CHECKPOINT_FIXED_INTERVAL =
-            GameRules.register("checkpointFixedInterval", GameRules.Category.PLAYER, GameRules.IntegerValue.create(600));
+    public static final Key<IntRule> CHECKPOINT_FIXED_INTERVAL =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "checkpointFixedInterval").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createIntRule(600, 0) // Default value, minimum value
+            );
 
-    public static final GameRules.Key<BooleanValue> USE_RANDOM_INTERVAL =
-            GameRules.register("useRandomCheckpointInterval", GameRules.Category.PLAYER, GameRules.BooleanValue.create(false));
+    public static final Key<BooleanRule> USE_RANDOM_INTERVAL =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "useRandomCheckpointInterval").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createBooleanRule(false)
+            );
 
-    public static final GameRules.Key<IntegerValue> RANDOM_CHECKPOINT_LOWER_BOUND =
-            GameRules.register("randomCheckpointLowerBound", GameRules.Category.PLAYER, GameRules.IntegerValue.create(600)); // Default: 10 minutes
+    public static final Key<IntRule> RANDOM_CHECKPOINT_LOWER_BOUND =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "randomCheckpointLowerBound").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createIntRule(600, 0) // Default 10 minutes, min 0
+            );
 
-    public static final GameRules.Key<IntegerValue> RANDOM_CHECKPOINT_UPPER_BOUND =
-            GameRules.register("randomCheckpointUpperBound", GameRules.Category.PLAYER, GameRules.IntegerValue.create(1200)); // Default: 20 minutes
+    public static final Key<IntRule> RANDOM_CHECKPOINT_UPPER_BOUND =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "randomCheckpointUpperBound").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createIntRule(1200, 1) // Default 20 minutes, min 1 (must be > lower bound ideally)
+            );
 
-    // New gamerules for the Artifact Flute cooldown.
-    public static final GameRules.Key<BooleanValue> FLUTE_COOLDOWN_ENABLED =
-            GameRules.register("fluteCooldownEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+    // --- Artifact Flute Rules ---
+    public static final Key<BooleanRule> FLUTE_COOLDOWN_ENABLED =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "fluteCooldownEnabled").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createBooleanRule(true)
+            );
 
-    // Duration in seconds for the cooldown.
-    public static final GameRules.Key<IntegerValue> FLUTE_COOLDOWN_DURATION =
-            GameRules.register("fluteCooldownDuration", GameRules.Category.PLAYER, GameRules.IntegerValue.create(60));
+    public static final Key<IntRule> FLUTE_COOLDOWN_DURATION =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "fluteCooldownDuration").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createIntRule(60, 0) // Default 60 seconds, min 0
+            );
 
-    // New gamerule to enable/disable the Artifact Flute entirely
-    public static final GameRules.Key<BooleanValue> ARTIFACT_FLUTE_ENABLED =
-            GameRules.register("artifactFluteEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+    public static final Key<BooleanRule> ARTIFACT_FLUTE_ENABLED =
+            GameRuleRegistry.register(
+                    Identifier.of(MineZeroMain.MOD_ID, "artifactFluteEnabled").toString(),
+                    Category.PLAYER,
+                    GameRuleFactory.createBooleanRule(true)
+            );
+
+    /**
+     * This method should be called once during your mod's initialization (e.g., in onInitialize)
+     * to ensure the game rules are registered.
+     * <p>
+     * Calling this method explicitly isn't strictly necessary if the static final fields
+     * are accessed, as that will trigger the static initializers. However, for clarity
+     * and to ensure registration happens, it's good practice to have an explicit init method.
+     * <p>
+     * Update: With Fabric API's GameRuleRegistry, the static final initializers are the
+     * registration itself. So, simply loading this class (e.g., by referencing one of its
+     * fields from your main initializer) is enough. No explicit `init()` call is needed.
+     */
+    public static void initialize() {
+        // Static initializers for the Keys above will handle registration.
+        // This method can be a no-op or just log that rules are set up.
+        MineZeroMain.LOGGER.info("MineZero game rules registered.");
+    }
 }

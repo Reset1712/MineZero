@@ -1,6 +1,6 @@
 package boomcow.minezero.network;
 
-import boomcow.minezero.MineZero;
+import boomcow.minezero.MineZeroMain;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -47,7 +47,7 @@ public class PacketHandler {
         // Get a registrar for your mod's channel.
         // The channel name is your MODID.
         // The version is for your channel's protocol; increment if you make breaking changes to any packets on this channel.
-        final PayloadRegistrar registrar = event.registrar(MineZero.MODID).versioned("1");
+        final PayloadRegistrar registrar = event.registrar(MineZeroMain.MODID).versioned("1");
 
         // Register your SelfDamagePacket (assuming it's C2S)
         // It needs:

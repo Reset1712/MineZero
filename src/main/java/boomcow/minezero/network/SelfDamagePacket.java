@@ -1,6 +1,6 @@
 package boomcow.minezero.network;
 
-import boomcow.minezero.MineZero;
+import boomcow.minezero.MineZeroMain;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.FriendlyByteBuf;
@@ -25,7 +25,7 @@ public record SelfDamagePacket() implements CustomPacketPayload {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     // 1. Unique ID for this payload type.
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "self_damage_trigger_v1");
+    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(MineZeroMain.MODID, "self_damage_trigger_v1");
 
     // 2. The Type object for registration.
     public static final Type<SelfDamagePacket> TYPE = new Type<>(ID);

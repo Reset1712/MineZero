@@ -28,5 +28,15 @@
   "_comment": "Keybinds",
   "key.categories.minezero": "MineZero Keybinds",
   "key.minezero.example_action": "Example Action",
-  "key.minezero.self_damage": "Damage Self With Weapon"
+  "key.minezero.self_damage": "Damage Self With Weapon",
+
+  "config.minezero.title": "MineZero Configuration",
+  "config.minezero.category.general": "General Settings",
+  "config.minezero.option.deathChime": "Death Chime Sound",
+  "config.minezero.option.deathChime.tooltip": "Select the chime sound played on death.\nOptions: CLASSIC, ALTERNATE.",
+  "config.minezero.option.exampleBoolean": "Example Toggle",
+  "config.minezero.option.exampleBoolean.tooltip": "This is an example boolean option.",
+
+
+
 }

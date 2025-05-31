@@ -1,6 +1,6 @@
 package boomcow.minezero.compat;
 
-import boomcow.minezero.MineZero;
+import boomcow.minezero.MineZeroMain;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
@@ -13,7 +13,7 @@ public class JEIMineZero implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
         // Use the static factory method for ResourceLocation
-        return ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "jei_plugin");
+        return ResourceLocation.fromNamespaceAndPath(MineZeroMain.MODID, "jei_plugin");
     }
 
     @Override

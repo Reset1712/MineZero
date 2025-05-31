@@ -1,67 +1,70 @@
-package boomcow.minezero.items;
+package boomcow.minezero.items; // Your package
 
-import boomcow.minezero.ModSoundEvents;
-import boomcow.minezero.checkpoint.CheckpointManager;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import boomcow.minezero.ModGameRules;
+import boomcow.minezero.ModGameRules;    // Your Fabric ModGameRules class
+import boomcow.minezero.ModSoundEvents;  // Your Fabric ModSoundEvents class
+import boomcow.minezero.checkpoint.CheckpointManager; // Ensure this uses Yarn mappings
+
+import net.minecraft.entity.player.PlayerEntity; // Yarn mapping
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity; // Yarn mapping
+import net.minecraft.sound.SoundCategory; // Yarn mapping
+import net.minecraft.text.Text; // Yarn mapping
+import net.minecraft.util.ActionResult; // Correct return type for your environment
+import net.minecraft.util.Hand; // Yarn mapping
+import net.minecraft.world.World; // Yarn mapping
 
 public class ArtifactFluteItem extends Item {
-    public ArtifactFluteItem(Properties properties) {
-        super(properties);
+    public ArtifactFluteItem(Settings settings) {
+        super(settings);
     }
 
-
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        if (!level.getGameRules().getBoolean(ModGameRules.ARTIFACT_FLUTE_ENABLED)) {
-            if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-                serverPlayer.displayClientMessage(Component.literal("The Artifact Flute is currently disabled by a game rule."), false); // Use false for chat, true for action bar
+    public ActionResult use(World world, PlayerEntity player, Hand hand) { // Corrected signature
+        ItemStack itemStackInHand = player.getStackInHand(hand);
+
+        if (!world.getGameRules().getBoolean(ModGameRules.ARTIFACT_FLUTE_ENABLED)) {
+            if (!world.isClient() && player instanceof ServerPlayerEntity serverPlayer) {
+                serverPlayer.sendMessage(Text.literal("The Artifact Flute is currently disabled by a game rule."), false);
             }
-            return InteractionResultHolder.fail(player.getItemInHand(hand));
+            return ActionResult.FAIL; // Return simple ActionResult
         }
-        if (!level.isClientSide) {
-            if (player instanceof ServerPlayer serverPlayer) {
-                // Check if the flute cooldown gamerule is enabled.
-                boolean cooldownEnabled = level.getGameRules().getBoolean(ModGameRules.FLUTE_COOLDOWN_ENABLED);
+
+        if (!world.isClient()) {
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                boolean cooldownEnabled = world.getGameRules().getBoolean(ModGameRules.FLUTE_COOLDOWN_ENABLED);
                 if (cooldownEnabled) {
-                    // Get the cooldown duration from the gamerule (in seconds) and convert to ticks.
-                    int cooldownSeconds = level.getGameRules().getInt(ModGameRules.FLUTE_COOLDOWN_DURATION);
+                    int cooldownSeconds = world.getGameRules().getInt(ModGamerules.FLUTE_COOLDOWN_DURATION);
                     int cooldownTicks = cooldownSeconds * 20;
 
-                    // If the item is still on cooldown, notify the player and cancel use.
-                    if (serverPlayer.getCooldowns().isOnCooldown(this)) {
-                        serverPlayer.displayClientMessage(Component.literal("Artifact Flute is on cooldown!"), true);
-                        return InteractionResultHolder.fail(player.getItemInHand(hand));
+                    if (serverPlayer.getItemCooldownManager().isCoolingDown(this)) {
+                        serverPlayer.sendMessage(Text.literal("Artifact Flute is on cooldown!"), true);
+                        return ActionResult.FAIL;
                     } else {
-                        // Apply the cooldown.
-                        serverPlayer.getCooldowns().addCooldown(this, cooldownTicks);
+                        serverPlayer.getItemCooldownManager().set(this, cooldownTicks);
                     }
                 }
 
-                // Trigger the checkpoint functionality
                 CheckpointManager.setCheckpoint(serverPlayer);
 
-                // Play the custom sound.
-                level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                        ModSoundEvents.FLUTE_CHIME.get(), // Ensure you have defined this sound.
-                        SoundSource.PLAYERS,
-                        1.0f, // Volume
-                        1.0f  // Pitch
+                world.playSound(
+                        null,
+                        player.getX(), player.getY(), player.getZ(),
+                        ModSoundEvents.FLUTE_CHIME,
+                        SoundCategory.PLAYERS,
+                        1.0f,
+                        1.0f
                 );
 
-                // Notify the player.
-                serverPlayer.displayClientMessage(Component.literal("Checkpoint set using the Artifact Flute!"), true);
+                serverPlayer.sendMessage(Text.literal("Checkpoint set using the Artifact Flute!"), true);
             }
         }
-        return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide);
-    }
 
+        // If an action was taken, return SUCCESS.
+        // The hand swing is usually handled by vanilla if SUCCESS is returned.
+        // If the item should be "consumed" (even if not literally shrinking stack count here),
+        // ActionResult.CONSUME might be more appropriate.
+        // For a non-consumable tool that performs an action, SUCCESS is typical.
+        return ActionResult.SUCCESS;
+    }
 }

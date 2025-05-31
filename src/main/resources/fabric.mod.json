@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": [
+    "${mod_authors}"
+  ],
+  "contact": {
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/mine-zero-return-by-death",
+    "sources": "https://www.curseforge.com/minecraft/mc-mods/mine-zero-return-by-death"
+  },
+  "license": "${mod_license}",
+  "icon": "assets/${mod_id}/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "${mod_group_id}.${mod_name}Main"
+    ],
+    "client": [
+      "${mod_group_id}.${mod_name}Client"
+    ],
+    "modmenu": [
+      "boomcow.minezero.config.ModMenuIntegration"
+    ]
+  },
+
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21",
+    "fabric-api": ">=${fabric_version}",
+    "fabric-key-binding-api-v1": "*"
+
+  },
+  "suggests": {
+
+  }
+}
