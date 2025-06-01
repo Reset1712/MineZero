@@ -1,4 +1,4 @@
-package boomcow.minezero.config; // Or boomcow.minezero.ConfigHandler
+package boomcow.minezero; // Or boomcow.minezero.ConfigHandler
 
 import boomcow.minezero.MineZeroMain;
 import me.shedaniel.autoconfig.AutoConfig;

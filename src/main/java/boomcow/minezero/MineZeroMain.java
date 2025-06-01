@@ -5,7 +5,7 @@ package boomcow.minezero; // Your package
 import boomcow.minezero.command.SetCheckPointCommand;
 import boomcow.minezero.command.SetSubaruPlayer;
 import boomcow.minezero.command.TriggerRBD;
-import boomcow.minezero.config.ConfigHandler;
+import boomcow.minezero.ConfigHandler;
 import boomcow.minezero.event.*;
 import boomcow.minezero.items.ArtifactFluteItem;
 import boomcow.minezero.util.LightningScheduler;
