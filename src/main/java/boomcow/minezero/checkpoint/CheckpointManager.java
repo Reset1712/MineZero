@@ -7,6 +7,8 @@ import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.ServerAdvancementManager;
@@ -20,11 +22,13 @@ import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.projectile.EyeOfEnder;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -97,10 +101,54 @@ public class CheckpointManager {
                 pdataObject.potionEffects.add(new MobEffectInstance(effect)); // Copy constructor is fine
             }
 
-            pdataObject.inventory.clear();
-            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-                pdataObject.inventory.add(player.getInventory().getItem(i).copy());
+            Inventory playerInventory = player.getInventory();
+            ListTag inventoryTag = new ListTag();
+
+            // Save main inventory
+            for (int i = 0; i < playerInventory.items.size(); ++i) {
+                ItemStack stack = playerInventory.items.get(i);
+                if (!stack.isEmpty()) {
+                    CompoundTag compoundtag = new CompoundTag();
+                    compoundtag.putByte("Slot", (byte) i);
+
+                    // --- THIS IS THE FIX ---
+                    // The .save() method returns a new tag with all the data. We must use its return value.
+                    Tag savedItemTag = stack.save(player.registryAccess(), compoundtag);
+                    inventoryTag.add(savedItemTag);
+                    // --- END FIX ---
+                }
             }
+
+            // Save armor
+            for (int j = 0; j < playerInventory.armor.size(); ++j) {
+                ItemStack stack = playerInventory.armor.get(j);
+                if (!stack.isEmpty()) {
+                    CompoundTag compoundtag1 = new CompoundTag();
+                    compoundtag1.putByte("Slot", (byte) (j + 100));
+
+                    // --- FIX APPLIED HERE TOO ---
+                    Tag savedItemTag = stack.save(player.registryAccess(), compoundtag1);
+                    inventoryTag.add(savedItemTag);
+                }
+            }
+
+            // Save offhand
+            for (int k = 0; k < playerInventory.offhand.size(); ++k) {
+                ItemStack stack = playerInventory.offhand.get(k);
+                if (!stack.isEmpty()) {
+                    CompoundTag compoundtag2 = new CompoundTag();
+                    compoundtag2.putByte("Slot", (byte) (k + 150));
+
+                    // --- AND FIX APPLIED HERE ---
+                    Tag savedItemTag = stack.save(player.registryAccess(), compoundtag2);
+                    inventoryTag.add(savedItemTag);
+                }
+            }
+
+            pdataObject.inventoryNBT = inventoryTag;
+
+            logger.info("Saving inventory for player {}: Generated ListTag with {} entries. NBT: {}",
+                    player.getName().getString(), inventoryTag.size(), inventoryTag.toString());
 
             CompoundTag capturedAdvancementsNBT = new CompoundTag();
             if (player.server != null) {
@@ -513,10 +561,58 @@ public class CheckpointManager {
                     }
 
                     // Restore inventory
-                    player.getInventory().clearContent();
-                    for (int i = 0; i < pdata.inventory.size(); i++) {
-                        player.getInventory().setItem(i, pdata.inventory.get(i));
+                    Inventory playerInventory = player.getInventory();
+                    playerInventory.clearContent(); // This is the part that wipes the inventory
+
+                    ListTag savedNbt = pdata.inventoryNBT;
+                    logger.info("Restoring inventory for {}. Received ListTag with {} entries.",
+                            player.getName().getString(), savedNbt.size());
+
+                    if (savedNbt.isEmpty()) {
+                        logger.warn("The saved inventory NBT for {} was empty. Nothing to restore.", player.getName().getString());
                     }
+
+                    for (int i = 0; i < savedNbt.size(); ++i) {
+                        CompoundTag itemTag = savedNbt.getCompound(i);
+                        int slot = itemTag.getByte("Slot") & 255;
+
+                        logger.debug("  -> Processing item tag for slot {}: {}", slot, itemTag.toString());
+
+                        if(lookupProvider == null) {
+                            logger.error("CRITICAL: The HolderLookup.Provider is NULL during restore! ItemStack.parse will fail.");
+                        }
+
+                        // Use the static parse method from ItemStack
+                        Optional<ItemStack> parsedStackOptional = ItemStack.parse(lookupProvider, itemTag);
+
+                        if (parsedStackOptional.isPresent()) {
+                            ItemStack itemstack = parsedStackOptional.get();
+                            if (!itemstack.isEmpty()) {
+                                logger.info("  Successfully parsed item: {} for slot {}", itemstack, slot);
+
+                                if (slot >= 0 && slot < playerInventory.items.size()) {
+                                    playerInventory.items.set(slot, itemstack);
+                                    logger.debug("    -> Placed in main inventory at index {}.", slot);
+                                } else if (slot >= 100 && slot < playerInventory.armor.size() + 100) {
+                                    playerInventory.armor.set(slot - 100, itemstack);
+                                    logger.debug("    -> Placed in armor inventory at index {}.", slot - 100);
+                                } else if (slot >= 150 && slot < playerInventory.offhand.size() + 150) {
+                                    playerInventory.offhand.set(slot - 150, itemstack);
+                                    logger.debug("    -> Placed in offhand inventory at index {}.", slot - 150);
+                                } else {
+                                    logger.warn("    -> Parsed item for an invalid slot number: {}. Item will be lost.", slot);
+                                }
+                            } else {
+                                logger.warn("  ItemStack.parse resulted in an EMPTY stack for slot {}. Original tag: {}", slot, itemTag);
+                            }
+                        } else {
+                            logger.error("  FAILED to parse ItemStack from NBT for slot {}. Original tag: {}", slot, itemTag);
+                        }
+                    }
+
+
+
+
                 }
             }
 

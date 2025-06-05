@@ -17,10 +17,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
@@ -167,10 +169,12 @@ public class MineZero {
 
         LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) logged in.", player.getName().getString(), player.getUUID());
 
-        if (data.getAnchorPlayerUUID() == null && data.getPlayerData(player.getUUID(), lookupProvider) == null) {
-            LOGGER.info("[MineZero][LOGIN] No anchor player set and player {} is new. Setting initial checkpoint.", player.getName().getString());
+        if (player.level().getGameRules().getBoolean(ModGameRules.SET_CHECKPOINT_ON_WORLD_CREATION) &&
+                data.getAnchorPlayerUUID() == null &&
+                data.getPlayerData(player.getUUID(), lookupProvider) == null) {
+
             CheckpointManager.setCheckpoint(player);
-            LOGGER.info("[MineZero][LOGIN] Initial anchor and checkpoint set for {}", player.getName().getString());
+
         } else if (data.getPlayerData(player.getUUID(), lookupProvider) == null) {
             LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) not found in current checkpoint data. Adding them now.", player.getName().getString(), player.getUUID());
             PlayerData pDataForNewPlayer = new PlayerData();
@@ -206,10 +210,42 @@ public class MineZero {
                 pDataForNewPlayer.potionEffects.add(new MobEffectInstance(effectInstance)); // Copy constructor
             }
 
-            pDataForNewPlayer.inventory.clear();
-            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-                pDataForNewPlayer.inventory.add(player.getInventory().getItem(i).copy());
+            Inventory playerInventory = player.getInventory();
+            ListTag inventoryTag = new ListTag();
+
+            // Save main inventory items (slots 0-35)
+            for (int i = 0; i < playerInventory.items.size(); ++i) {
+                if (!playerInventory.items.get(i).isEmpty()) {
+                    CompoundTag compoundtag = new CompoundTag();
+                    compoundtag.putByte("Slot", (byte) i);
+                    // Use the save method from ItemStack that takes a registry access and the output tag
+                    playerInventory.items.get(i).save(player.registryAccess(), compoundtag);
+                    inventoryTag.add(compoundtag);
+                }
             }
+
+            // Save armor items (slots 100-103)
+            for (int j = 0; j < playerInventory.armor.size(); ++j) {
+                if (!playerInventory.armor.get(j).isEmpty()) {
+                    CompoundTag compoundtag1 = new CompoundTag();
+                    compoundtag1.putByte("Slot", (byte) (j + 100));
+                    playerInventory.armor.get(j).save(player.registryAccess(), compoundtag1);
+                    inventoryTag.add(compoundtag1);
+                }
+            }
+
+            // Save offhand item (slot 150)
+            for (int k = 0; k < playerInventory.offhand.size(); ++k) {
+                if (!playerInventory.offhand.get(k).isEmpty()) {
+                    CompoundTag compoundtag2 = new CompoundTag();
+                    compoundtag2.putByte("Slot", (byte) (k + 150));
+                    playerInventory.offhand.get(k).save(player.registryAccess(), compoundtag2);
+                    inventoryTag.add(compoundtag2);
+                }
+            }
+
+            // Store the completed tag in our data object
+            pDataForNewPlayer.inventoryNBT = inventoryTag;
 
             CompoundTag advTag = new CompoundTag();
             if (player.server != null) {

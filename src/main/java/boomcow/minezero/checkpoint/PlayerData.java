@@ -8,12 +8,10 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class PlayerData {
     public double posX;
@@ -31,17 +29,16 @@ public class PlayerData {
     public float experienceProgress;
     public int fireTicks;
     public ResourceKey<Level> dimension;
-    public List<ItemStack> inventory = new ArrayList<>();
     public String gameMode;
     public double spawnX;
     public double spawnY;
     public double spawnZ;
     public ResourceKey<Level> spawnDimension;
     public boolean spawnForced;
-
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
-    // New field for advancements.
     public CompoundTag advancements = new CompoundTag();
+
+    public ListTag inventoryNBT = new ListTag();
 
     public CompoundTag toNBT(HolderLookup.Provider lookupProvider) {
         CompoundTag tag = new CompoundTag();
@@ -56,12 +53,10 @@ public class PlayerData {
         tag.putFloat("Pitch", pitch);
         tag.putFloat("Health", health);
         tag.putInt("Hunger", hunger);
-
         tag.putInt("FireTicks", fireTicks);
         tag.putString("GameMode", gameMode);
         tag.putInt("ExperienceLevel", experienceLevel);
         tag.putFloat("ExperienceProgress", experienceProgress);
-
         tag.putDouble("SpawnX", spawnX);
         tag.putDouble("SpawnY", spawnY);
         tag.putDouble("SpawnZ", spawnZ);
@@ -74,21 +69,8 @@ public class PlayerData {
         // Save potion effects
         ListTag effectsTag = new ListTag();
         for (MobEffectInstance effect : potionEffects) {
-            // 1. Get the Tag from save()
             Tag effectNbtTag = effect.save(); // save() returns Tag
-
-            // 2. ListTag.add(Tag) accepts any Tag, so this is fine.
-            //    No cast to CompoundTag is strictly necessary for the .add() operation itself.
             effectsTag.add(effectNbtTag);
-
-            // If you needed to operate on it as a CompoundTag for some other reason (not needed here):
-            // if (effectNbtTag instanceof CompoundTag) {
-            //     CompoundTag specificEffectCompoundTag = (CompoundTag) effectNbtTag;
-            //     // Now you can use specificEffectCompoundTag with methods requiring CompoundTag
-            // } else if (effectNbtTag != null) {
-            //     // This would be unexpected if MobEffectInstance always saves as CompoundTag
-            //     PD_LOGGER.warn("MobEffectInstance saved as a Tag type other than CompoundTag: {}", effectNbtTag.getType().getName());
-            // }
         }
         tag.put("PotionEffects", effectsTag);
 
@@ -102,19 +84,7 @@ public class PlayerData {
             tag.putString("Dimension", dimension.location().toString());
         }
 
-        // --- CORRECTED Inventory Saving ---
-        CompoundTag invSlotsTag = new CompoundTag(); // Your original structure for inventory
-        for (int i = 0; i < inventory.size(); i++) {
-            ItemStack currentStack = inventory.get(i);
-            if (currentStack != null && !currentStack.isEmpty()) {
-                // ItemStack.save(HolderLookup.Provider) returns CompoundTag
-                Tag stackNbt = currentStack.save(lookupProvider);
-                invSlotsTag.put("Slot" + i, stackNbt);
-            }
-        }
-        if (!invSlotsTag.isEmpty()) {
-            tag.put("Inventory", invSlotsTag);
-        }
+        tag.put("Inventory", this.inventoryNBT);
 
 
 
@@ -135,12 +105,10 @@ public class PlayerData {
         data.health = tag.getFloat("Health");
         data.hunger = tag.getInt("Hunger");
         data.fireTicks = tag.getInt("FireTicks");
-
         data.spawnX = tag.getDouble("SpawnX");
         data.spawnY = tag.getDouble("SpawnY");
         data.spawnZ = tag.getDouble("SpawnZ");
         data.spawnForced = tag.getBoolean("SpawnForced");
-
         data.experienceLevel = tag.getInt("ExperienceLevel");
         data.experienceProgress = tag.getFloat("ExperienceProgress");
 
@@ -192,32 +160,9 @@ public class PlayerData {
             data.gameMode = tag.getString("GameMode");
         }
 
-        CompoundTag invTag = tag.getCompound("Inventory");
-        data.inventory.clear();
-        if (tag.contains("Inventory", Tag.TAG_COMPOUND)) {
-            CompoundTag invSlotsTag = tag.getCompound("Inventory"); // Use the variable name you used in toNBT
-            int i = 0;
-            // Loop while "Slot" + i exists. Consider a max slot count for safety if NBT could be malformed.
-            while (invSlotsTag.contains("Slot" + i, Tag.TAG_COMPOUND)) { // Check type with Tag.TAG_COMPOUND (which is 10)
-                CompoundTag stackNbt = invSlotsTag.getCompound("Slot" + i);
-
-                // --- CORRECTED ItemStack deserialization ---
-                // Use ItemStack.parse(HolderLookup.Provider, CompoundTag) which returns Optional<ItemStack>
-                Optional<ItemStack> parsedStackOptional = ItemStack.parse(lookupProvider, stackNbt);
-
-                // Add the ItemStack if present, otherwise add ItemStack.EMPTY or handle error
-                if (parsedStackOptional.isPresent()) {
-                    data.inventory.add(parsedStackOptional.get());
-                } else {
-                    // If parsing fails, the Optional will be empty.
-                    // You might want to add an empty stack to maintain slot count, or log an error.
-                    data.inventory.add(ItemStack.EMPTY); // Add an empty stack to keep slot indices consistent if needed
-                    // PD_LOGGER.warn("Failed to parse ItemStack from NBT for slot {}: {}", i, stackNbt);
-                    System.err.println("Failed to parse ItemStack from NBT for slot " + i + ": " + stackNbt);
-                }
-                // --- END CORRECTION ---
-                i++;
-            }
+        // Use the corresponding standard helper method to load the lists.
+        if (tag.contains("Inventory", Tag.TAG_LIST)) {
+            data.inventoryNBT = tag.getList("Inventory", Tag.TAG_COMPOUND);
         }
 
 
