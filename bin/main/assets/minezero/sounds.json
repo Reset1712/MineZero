@@ -1,0 +1,22 @@
+{
+  "death_chime": {
+    "sounds": [
+      { "name": "minezero:death_chime" }
+    ]
+  },
+  "alt_death_chime": {
+    "sounds": [
+      { "name": "minezero:alt_death_chime" }
+    ]
+  },
+  "empty_sound": {
+    "sounds": [
+      { "name": "minezero:empty_sound" }
+    ]
+  },
+  "flute_chime": {
+    "sounds": [
+      { "name": "minezero:flute_chime" }
+    ]
+  }
+}

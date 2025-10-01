@@ -13,7 +13,7 @@ public class SetCheckPointCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("setcheckpoint")
-                        .requires(cs -> cs.hasPermission(2)) // op-level 2 required
+                        .requires(cs -> cs.hasPermission(2)) 
                         .executes(context -> {
                             CommandSourceStack source = context.getSource();
                             ServerPlayer player;
@@ -34,9 +34,11 @@ public class SetCheckPointCommand {
                                     ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "target");
 
                                     CheckpointManager.setCheckpoint(targetPlayer);
-                                    source.sendSuccess(() -> Component.literal("Checkpoint set for " + targetPlayer.getName().getString() + "!"), true);
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "Checkpoint set for " + targetPlayer.getName().getString() + "!"),
+                                            true);
                                     return 1;
-                                }))
-        );
+                                })));
     }
 }

@@ -1,0 +1,35 @@
+{
+  "item.minezero.artifact_flute": "Artifact Flute",
+
+  "gamerule.autoCheckpointEnabled": "Auto Checkpoints",
+  "gamerule.autoCheckpointEnabled.description": "Enable or disable automatic checkpoint creation.",
+
+  "gamerule.checkpointFixedInterval": "Fixed Checkpoint Interval",
+  "gamerule.checkpointFixedInterval.description": "Number of seconds between each checkpoint.",
+
+  "gamerule.useRandomCheckpointInterval": "Use Random Interval",
+  "gamerule.useRandomCheckpointInterval.description": "Randomly choose an interval between [Lower Bound] and [Upper Bound] seconds for checkpoints.",
+
+  "gamerule.randomCheckpointLowerBound": "Random Checkpoint Lower Bound",
+  "gamerule.randomCheckpointLowerBound.description": "The lower bound (in seconds) for the random checkpoint interval.",
+
+  "gamerule.randomCheckpointUpperBound": "Random Checkpoint Upper Bound",
+  "gamerule.randomCheckpointUpperBound.description": "The upper bound (in seconds) for the random checkpoint interval.",
+
+  "gamerule.fluteCooldownEnabled": "Flute Cooldown Enabled",
+  "gamerule.fluteCooldownEnabled.description": "Enable or disable the cooldown for using the Artifact Flute.",
+
+  "gamerule.fluteCooldownDuration": "Flute Cooldown Duration",
+  "gamerule.fluteCooldownDuration.description": "Duration in seconds for the Artifact Flute cooldown.",
+
+  "gamerule.artifactFluteEnabled": "Artifact Flute Enabled",
+  "gamerule.artifactFluteEnabled.description": "Enable or disable the Artifact Flute feature.",
+
+  "gamerule.setCheckpointOnWorldCreation":" Set Checkpoint on World Creation",
+  "gamerule.setCheckpointOnWorldCreation.description": "Automatically set a checkpoint when a new world is created.",
+
+  "_comment": "Keybinds",
+  "key.categories.minezero": "MineZero Keybinds",
+  "key.minezero.example_action": "Example Action",
+  "key.minezero.self_damage": "Damage Self With Weapon"
+}

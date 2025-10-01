@@ -26,18 +26,19 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class BlockChangeListener {
     private static final Logger LOGGER_BCL = LogManager.getLogger("MineZeroBCL");
+
     private static WorldData getActiveWorldData(ServerLevel level) {
-        if (level == null || level.getServer() == null) return null;
-        CheckpointData checkpointData = CheckpointData.get(level); // Get the global checkpoint data
-        return checkpointData.getWorldData(); // Get the WorldData instance from it
+        if (level == null || level.getServer() == null)
+            return null;
+        CheckpointData checkpointData = CheckpointData.get(level);
+        return checkpointData.getWorldData();
     }
 
-    // 1. Solid block placement
     @SubscribeEvent
     public static void onSolidBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ServerLevel level = (ServerLevel) player.level();
-            WorldData worldDataInstance = getActiveWorldData(level); // Get the instance
+            WorldData worldDataInstance = getActiveWorldData(level);
 
             if (worldDataInstance == null) {
                 LOGGER_BCL.warn("Could not get active WorldData for block placement tracking.");
@@ -45,28 +46,28 @@ public class BlockChangeListener {
             }
 
             BlockState newState = event.getState();
-            BlockPos pos = event.getPos().immutable(); // Ensure immutable
-            // int dimensionIndex = WorldData.getGlobalDimensionId(level.dimension()); // Use static utility if needed globally
+            BlockPos pos = event.getPos().immutable();
 
-            if (newState.getBlock() instanceof LiquidBlock) return;
+            if (newState.getBlock() instanceof LiquidBlock)
+                return;
 
             if (newState.getBlock() == Blocks.END_PORTAL_FRAME && newState.getValue(EndPortalFrameBlock.HAS_EYE)) {
-                worldDataInstance.getAddedEyes().add(pos); // Access via instance
+                worldDataInstance.getAddedEyes().add(pos);
                 return;
             }
 
             LOGGER_BCL.info("Block placed at: " + pos + " tracking in instance WorldData.");
-            worldDataInstance.getModifiedBlocks().add(pos); // Access via instance
-            worldDataInstance.getInstanceBlockDimensionIndices().put(pos, WorldData.getDimensionIndex(level.dimension())); // Access via instance
+            worldDataInstance.getModifiedBlocks().add(pos);
+            worldDataInstance.getInstanceBlockDimensionIndices().put(pos,
+                    WorldData.getDimensionIndex(level.dimension()));
         }
     }
 
-    // 2. Solid block break
     @SubscribeEvent
     public static void onSolidBlockBreak(BlockEvent.BreakEvent event) {
         if (event.getPlayer() instanceof ServerPlayer player) {
             ServerLevel level = (ServerLevel) player.level();
-            WorldData worldDataInstance = getActiveWorldData(level); // Get the instance
+            WorldData worldDataInstance = getActiveWorldData(level);
 
             if (worldDataInstance == null) {
                 LOGGER_BCL.warn("Could not get active WorldData for block break tracking.");
@@ -75,7 +76,6 @@ public class BlockChangeListener {
 
             BlockState state = event.getState();
             if (!(state.getBlock() instanceof LiquidBlock)) {
-                // int dimensionIndex = WorldData.getGlobalDimensionId(level.dimension());
 
                 List<BlockPos> brokenBlockPositions = new ArrayList<>();
                 BlockPos pos = event.getPos().immutable();
@@ -98,29 +98,26 @@ public class BlockChangeListener {
                 }
 
                 for (BlockPos currentPos : brokenBlockPositions) {
-                    if (worldDataInstance.getModifiedBlocks().contains(currentPos)) { // Access via instance
-                        worldDataInstance.getModifiedBlocks().remove(currentPos); // Access via instance
+                    if (worldDataInstance.getModifiedBlocks().contains(currentPos)) {
+                        worldDataInstance.getModifiedBlocks().remove(currentPos);
                     } else {
-                        BlockState currentState = level.getBlockState(currentPos); // Get fresh state
-                        worldDataInstance.getMinedBlocks().put(currentPos, currentState); // Access via instance
-                        worldDataInstance.getInstanceBlockDimensionIndices().put(currentPos, WorldData.getDimensionIndex(level.dimension())); // Access via instance
+                        BlockState currentState = level.getBlockState(currentPos);
+                        worldDataInstance.getMinedBlocks().put(currentPos, currentState);
+                        worldDataInstance.getInstanceBlockDimensionIndices().put(currentPos,
+                                WorldData.getDimensionIndex(level.dimension()));
                     }
                 }
             }
         }
     }
 
-
-
-
-
-
     @SubscribeEvent
     public static void onBucketRightClick(PlayerInteractEvent.RightClickBlock event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
 
-        ServerLevel level = (ServerLevel) event.getLevel(); // Use event.getLevel()
-        WorldData worldDataInstance = getActiveWorldData(level); // Get the instance
+        ServerLevel level = (ServerLevel) event.getLevel();
+        WorldData worldDataInstance = getActiveWorldData(level);
 
         if (worldDataInstance == null) {
             LOGGER_BCL.warn("Could not get active WorldData for bucket interaction tracking.");
@@ -129,47 +126,44 @@ public class BlockChangeListener {
 
         ItemStack stack = event.getItemStack();
         if (stack.getItem() instanceof BucketItem bucketItem) {
-            // int dimensionIndex = WorldData.getGlobalDimensionId(level.dimension());
-            BlockPos clickedPos = event.getPos().immutable(); // The block that was clicked
-            BlockPos targetPos = clickedPos.relative(event.getFace()).immutable(); // The block where fluid might be placed/removed
+            BlockPos clickedPos = event.getPos().immutable();
+            BlockPos targetPos = clickedPos.relative(event.getFace()).immutable();
 
-            if (bucketItem.getFluid() == Fluids.LAVA || bucketItem.getFluid() == Fluids.WATER) { // Placing fluid
-                worldDataInstance.getModifiedFluidBlocks().add(targetPos); // Access via instance
-                worldDataInstance.getInstanceBlockDimensionIndices().put(targetPos, WorldData.getDimensionIndex(level.dimension()));// Access via instance
+            if (bucketItem.getFluid() == Fluids.LAVA || bucketItem.getFluid() == Fluids.WATER) {
+                worldDataInstance.getModifiedFluidBlocks().add(targetPos);
+                worldDataInstance.getInstanceBlockDimensionIndices().put(targetPos,
+                        WorldData.getDimensionIndex(level.dimension()));
                 LOGGER_BCL.info("Fluid placed at: " + targetPos + " tracking in instance WorldData.");
-            } else if (bucketItem.getFluid() == Fluids.EMPTY) { // Picking up fluid
-                // When picking up, the fluid is AT the clickedPos (if it's a source block)
-                // or at targetPos if you clicked an adjacent solid block.
-                // Minecraft's BucketItem logic targets the block clicked OR the space next to it.
-                // Let's check the block directly clicked first, then the adjacent one if the clicked one isn't fluid.
+            } else if (bucketItem.getFluid() == Fluids.EMPTY) {
+
                 BlockState fluidStateSource = level.getBlockState(clickedPos);
                 BlockPos actualFluidPos = null;
 
-                if (fluidStateSource.getFluidState().isSourceOfType(Fluids.WATER) || fluidStateSource.getFluidState().isSourceOfType(Fluids.LAVA)) {
+                if (fluidStateSource.getFluidState().isSourceOfType(Fluids.WATER)
+                        || fluidStateSource.getFluidState().isSourceOfType(Fluids.LAVA)) {
                     actualFluidPos = clickedPos;
                 } else {
-                    // If clicked block is not a fluid source, check the adjacent block where fluid would be placed from an empty bucket
-                    // This logic might need refinement based on vanilla bucket behavior.
-                    // Vanilla bucket pickup primarily targets the block *at* event.getPos()
+
                     BlockState adjacentState = level.getBlockState(targetPos);
-                    if (adjacentState.getFluidState().isSourceOfType(Fluids.WATER) || adjacentState.getFluidState().isSourceOfType(Fluids.LAVA)) {
+                    if (adjacentState.getFluidState().isSourceOfType(Fluids.WATER)
+                            || adjacentState.getFluidState().isSourceOfType(Fluids.LAVA)) {
                         actualFluidPos = targetPos;
                     }
                 }
 
-                // If we are trying to pick up from event.getPos() directly
-                if(actualFluidPos == null && (level.getBlockState(event.getPos()).getFluidState().is(Fluids.WATER) || level.getBlockState(event.getPos()).getFluidState().is(Fluids.LAVA))){
+                if (actualFluidPos == null && (level.getBlockState(event.getPos()).getFluidState().is(Fluids.WATER)
+                        || level.getBlockState(event.getPos()).getFluidState().is(Fluids.LAVA))) {
                     actualFluidPos = event.getPos();
                 }
 
-
                 if (actualFluidPos != null) {
-                    BlockState stateToMine = level.getBlockState(actualFluidPos); // Get the actual state
-                    if (worldDataInstance.getModifiedFluidBlocks().contains(actualFluidPos)) { // Access via instance
-                        worldDataInstance.getModifiedFluidBlocks().remove(actualFluidPos); // Access via instance
+                    BlockState stateToMine = level.getBlockState(actualFluidPos);
+                    if (worldDataInstance.getModifiedFluidBlocks().contains(actualFluidPos)) {
+                        worldDataInstance.getModifiedFluidBlocks().remove(actualFluidPos);
                     } else {
-                        worldDataInstance.getMinedFluidBlocks().put(actualFluidPos, stateToMine); // Access via instance
-                        worldDataInstance.getInstanceBlockDimensionIndices().put(actualFluidPos, WorldData.getDimensionIndex(level.dimension())); // Access via instance
+                        worldDataInstance.getMinedFluidBlocks().put(actualFluidPos, stateToMine);
+                        worldDataInstance.getInstanceBlockDimensionIndices().put(actualFluidPos,
+                                WorldData.getDimensionIndex(level.dimension()));
                     }
                     LOGGER_BCL.info("Fluid picked up from: " + actualFluidPos + " tracking in instance WorldData.");
                 }

@@ -22,10 +22,12 @@ public class SetSubaruPlayer {
                                     ServerLevel level = target.serverLevel();
                                     CheckpointData data = CheckpointData.get(level);
                                     data.setAnchorPlayerUUID(target.getUUID());
-                                    context.getSource().sendSuccess(() -> Component.literal("Anchor player set to " + target.getName().getString()), true);
+                                    context.getSource().sendSuccess(
+                                            () -> Component
+                                                    .literal("Anchor player set to " + target.getName().getString()),
+                                            true);
                                     return 1;
-                                }))
-        );
+                                })));
 
     }
 }
