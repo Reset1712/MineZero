@@ -20,9 +20,7 @@ import java.util.*;
 
 public class CheckpointData extends SavedData {
     public static final String DATA_NAME = "global_checkpoint";
-    private static final Logger LOGGER = LogUtils.getLogger(); // SLF4J Logger
-
-    // NBT Keys
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final String KEY_CHECKPOINT_DIMENSION = "checkpointDimension";
     private static final String KEY_PLAYERS_DATA = "playersData";
     private static final String KEY_FIRE_TICKS = "fireTicks";
@@ -41,7 +39,7 @@ public class CheckpointData extends SavedData {
     private static final String KEY_CHECKPOINT_INVENTORY = "checkpointInventory";
     private static final String KEY_WORLD_DATA = "worldCheckpointData";
 
-    private ResourceKey<Level> checkpointDimension; // Track the dimension
+    private ResourceKey<Level> checkpointDimension;
     public void setCheckpointDimension(ResourceKey<Level> dimension) {
         this.checkpointDimension = dimension;
         this.setDirty();
@@ -54,12 +52,10 @@ public class CheckpointData extends SavedData {
     }
     private Map<UUID, CompoundTag> playersData = new HashMap<>();
 
-    public void savePlayerData(UUID uuid, CompoundTag playerDataNBT) { // Now takes pre-serialized NBT
+    public void savePlayerData(UUID uuid, CompoundTag playerDataNBT) {
         this.playersData.put(uuid, playerDataNBT);
         setDirty();
     }
-
-    // getPlayerData now needs HolderLookup.Provider to deserialize
     public PlayerData getPlayerData(UUID uuid, HolderLookup.Provider lookupProvider) {
         CompoundTag nbt = playersData.get(uuid);
         if (nbt != null) {
@@ -127,7 +123,7 @@ public class CheckpointData extends SavedData {
     }
 
     public static CheckpointData load(CompoundTag nbt, HolderLookup.Provider lookupProvider) {
-        CheckpointData data = new CheckpointData(); // worldData is already initialized in constructor
+        CheckpointData data = new CheckpointData();
 
         if (nbt.contains(KEY_CHECKPOINT_DIMENSION, Tag.TAG_STRING)) {
             try {
@@ -185,9 +181,6 @@ public class CheckpointData extends SavedData {
         }
         if (data.entityData.size() > 0 && data.entityData.size() != data.entityDimensions.size()) {
             LOGGER.warn("Mismatch in loaded entityData ({}) and entityDimensions ({}). Entity data might be corrupt or incomplete.", data.entityData.size(), data.entityDimensions.size());
-            // Optionally clear both lists if this is critical data integrity issue
-            // data.entityData.clear();
-            // data.entityDimensions.clear();
         }
 
 
@@ -197,7 +190,7 @@ public class CheckpointData extends SavedData {
             for (String key : aggroTag.getAllKeys()) {
                 try {
                     UUID entityUUID = UUID.fromString(key);
-                    if (aggroTag.hasUUID(key)) { // Make sure the value is also a valid UUID
+                    if (aggroTag.hasUUID(key)) {
                         UUID targetUUID = aggroTag.getUUID(key);
                         data.entityAggroTargets.put(entityUUID, targetUUID);
                     } else {
@@ -216,20 +209,14 @@ public class CheckpointData extends SavedData {
                 data.groundItems.add(groundItemsListTag.getCompound(i));
             }
         }
-
-        // Load WorldData
         if (nbt.contains(KEY_WORLD_DATA, Tag.TAG_COMPOUND)) {
-            // data.worldData is already initialized, so we just load into it
             data.worldData.loadFromNBT(nbt.getCompound(KEY_WORLD_DATA), lookupProvider);
         } else {
             LOGGER.warn("Checkpoint NBT is missing WorldData. A new empty WorldData will be used.");
-            // data.worldData will be the new empty one from the constructor
         }
         LOGGER.debug("CheckpointData loaded from NBT.");
         return data;
     }
-
-    // Saves nbt data to a compound tag
     @Override
     public CompoundTag save(CompoundTag nbt, HolderLookup.Provider provider) {
         if (checkpointDimension != null) {
@@ -268,7 +255,7 @@ public class CheckpointData extends SavedData {
 
         ListTag entityDimListNbt = new ListTag();
         for (ResourceKey<Level> dimKey : entityDimensions) {
-            if (dimKey != null) { // Check for null before accessing location
+            if (dimKey != null) {
                 entityDimListNbt.add(StringTag.valueOf(dimKey.location().toString()));
             }
         }
@@ -285,29 +272,21 @@ public class CheckpointData extends SavedData {
             groundItemsListNbt.add(itemNBT);
         }
         nbt.put(KEY_GROUND_ITEMS, groundItemsListNbt);
-
-        // Save WorldData
         CompoundTag worldDataNbt = new CompoundTag();
-        if (this.worldData != null) { // Should always be true due to initialization
+        if (this.worldData != null) {
             this.worldData.saveToNBT(worldDataNbt);
         }
         nbt.put(KEY_WORLD_DATA, worldDataNbt);
         LOGGER.debug("CheckpointData saved to NBT.");
-        return nbt; // This is critical! Return the modified nbt.
+        return nbt;
     }
 
     public static CheckpointData get(ServerLevel level) {
-        // The DimensionDataStorage system will provide the HolderLookup.Provider
-        // to the factory's load method (the second argument of the BiFunction).
 
         SavedData.Factory<CheckpointData> factory = new SavedData.Factory<>(
-                () -> new CheckpointData(), // Supplier: () -> T
-                // Deserializer: (CompoundTag nbt, HolderLookup.Provider provider) -> T
-                // The 'provider' here is supplied by the game's SavedData loading mechanism.
-                (nbt, provider) -> CheckpointData.load(nbt, provider), // <--- CORRECTED LAMBDA SIGNATURE
-                null // Optional DataFixerOptions, use DataFixerOptions.none() if no datafixers or null in some versions.
-                // Check your NeoForge SavedData.Factory constructor, it might take DataFixerOptions.
-                // If it takes DataFixerType, then null is fine if you don't use it.
+                () -> new CheckpointData(),
+                (nbt, provider) -> CheckpointData.load(nbt, provider),
+                null
         );
 
         return level.getServer().overworld().getDataStorage()
@@ -315,7 +294,7 @@ public class CheckpointData extends SavedData {
     }
 
     public String toString(ServerLevel level) {
-        CheckpointData data = get(level); // Call the get method to retrieve the data
+        CheckpointData data = get(level);
         StringBuilder sb = new StringBuilder();
         sb.append("CheckpointData:\n");
         sb.append("AnchorPlayerUUID: ").append(data.getAnchorPlayerUUID()).append("\n");
@@ -424,7 +403,7 @@ public class CheckpointData extends SavedData {
     }
 
     @Override
-    public String toString() { // Removed ServerLevel parameter as it's not needed for basic toString
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("CheckpointData Instance:\n");
         sb.append("  AnchorPlayerUUID: ").append(anchorPlayerUUID).append("\n");

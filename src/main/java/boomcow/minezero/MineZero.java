@@ -59,55 +59,40 @@ public class MineZero {
 
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
-    // For other types like SoundEvents, you'd use:
-    // public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(Registries.SOUND_EVENT, MODID);
-
-
-    // Block and BlockItem example
-    // DeferredRegister.register now typically returns DeferredHolder<T>
     public static final DeferredHolder<Block, Block> EXAMPLE_BLOCK = BLOCKS.register("example_block",
-            () -> new Block(BlockBehaviour.Properties.of().strength(1.5F, 6.0F))); // Example properties for stone
+            () -> new Block(BlockBehaviour.Properties.of().strength(1.5F, 6.0F)));
 
     public static final DeferredHolder<Item, BlockItem> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block",
             () -> new BlockItem(EXAMPLE_BLOCK.get(), new Item.Properties()));
-
-    // Artifact Flute Item
     public static final DeferredHolder<Item, ArtifactFluteItem> ARTIFACT_FLUTE = ITEMS.register("artifact_flute",
             () -> new ArtifactFluteItem(new Item.Properties().stacksTo(1)));
 
-    public MineZero(IEventBus modEventBus, ModContainer modContainer) { // NeoForge MDKs often pass IEventBus to constructor
-
-        // Register event listeners on the MOD event bus
+    public MineZero(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::clientSetup); // Client setup on mod bus
-        modEventBus.addListener(this::registerKeyMappings); // Key mappings on mod bus
+        modEventBus.addListener(this::clientSetup);
+        modEventBus.addListener(this::registerKeyMappings);
         modEventBus.addListener(this::addCreative);
-        // Config events on mod bus
-        modEventBus.addListener(ConfigHandler::onLoad); // Assuming static methods in ConfigHandler
+        modEventBus.addListener(ConfigHandler::onLoad);
         modEventBus.addListener(ConfigHandler::onReload);
-
-        // Register DeferredRegisters to the mod event bus
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
-        ModSoundEvents.SOUND_EVENTS.register(modEventBus); // Register sounds
+        ModSoundEvents.SOUND_EVENTS.register(modEventBus);
         PacketHandler.register(modEventBus);
-
-        // Register general event handlers to the NeoForge event bus
-        NeoForge.EVENT_BUS.register(this); // For @SubscribeEvent methods in this class
+        NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new DeathEventHandler());
 
-        NeoForge.EVENT_BUS.register(BlockChangeListener.class); // <--- ADD THIS LINE
-        NeoForge.EVENT_BUS.register(CheckpointTicker.class); // <--- ADD THIS LINE
-        NeoForge.EVENT_BUS.register(ExplosionEventHandler.class); // <--- ADD THIS LINE
-        NeoForge.EVENT_BUS.register(GlobalTickHandler.class); // <--- ADD THIS LINE
-        NeoForge.EVENT_BUS.register(LightningStrikeListener.class); // Register DeathEventHandler for player death events
-        NeoForge.EVENT_BUS.register(NonPlayerChangeHandler.class); // Register DeathEventHandler for player death events
+        NeoForge.EVENT_BUS.register(BlockChangeListener.class);
+        NeoForge.EVENT_BUS.register(CheckpointTicker.class);
+        NeoForge.EVENT_BUS.register(ExplosionEventHandler.class);
+        NeoForge.EVENT_BUS.register(GlobalTickHandler.class);
+        NeoForge.EVENT_BUS.register(LightningStrikeListener.class);
+        NeoForge.EVENT_BUS.register(NonPlayerChangeHandler.class);
 
 
 
 
 
-        if (modContainer != null) { // Ensure modContainer is available
+        if (modContainer != null) {
             modContainer.registerConfig(ModConfig.Type.COMMON, ConfigHandler.COMMON_CONFIG_SPEC);
         } else {
             LOGGER.warn("ModContainer was not injected, attempting to get active container for config registration. This might be unreliable.");
@@ -115,8 +100,6 @@ public class MineZero {
             LOGGER.error("CRITICAL: ModContainer not available for config registration. Configs will not be loaded for {}.", MODID);
         }
     }
-
-    // RegisterCommandsEvent is on the NeoForge event bus
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         SetCheckPointCommand.register(event.getDispatcher());
@@ -129,35 +112,20 @@ public class MineZero {
         LOGGER.info("DIRT BLOCK >> {}", BuiltInRegistries.BLOCK.getKey(Blocks.DIRT));
 
         LOGGER.info("Loading custom game rules: autoCheckpointEnabled = {}", ModGameRules.AUTO_CHECKPOINT_ENABLED);
-
-        // --- CORRECTED: Use event.enqueueWork directly ---
-        // If you have tasks for common setup that need to be on the main thread:
         event.enqueueWork(() -> {
             LOGGER.info("This is a task running on the main thread after common setup dispatch (from commonSetup).");
-            // Example: Some registration that must happen on main thread and isn't an event listener setup.
-            // MyOtherClass.initializeCommonThreadSafeStuff();
         });
-        // --- END CORRECTION ---
     }
-
-    // Listener for BuildCreativeModeTabContentsEvent (on NeoForge.EVENT_BUS)
     public void addCreative(BuildCreativeModeTabContentsEvent event) {
-        // Accessing CreativeModeTabs constants directly
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
-            event.accept(EXAMPLE_BLOCK_ITEM.get()); // .get() on DeferredHolder
+            event.accept(EXAMPLE_BLOCK_ITEM.get());
         }
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(ARTIFACT_FLUTE.get()); // .get() on DeferredHolder
+            event.accept(ARTIFACT_FLUTE.get());
         }
     }
 
-    // setupNetworking merged into commonSetup via enqueueWork
 
-    // Config event listeners are now registered in the constructor to the modEventBus
-    // The static methods in ConfigHandler will be called.
-
-
-    // PlayerEvent.PlayerLoggedInEvent is on the NeoForge event bus
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -206,25 +174,23 @@ public class MineZero {
             }
 
             pDataForNewPlayer.potionEffects.clear();
-            for (MobEffectInstance effectInstance : player.getActiveEffects()) { // Renamed variable for clarity
-                pDataForNewPlayer.potionEffects.add(new MobEffectInstance(effectInstance)); // Copy constructor
+            for (MobEffectInstance effectInstance : player.getActiveEffects()) { 
+                pDataForNewPlayer.potionEffects.add(new MobEffectInstance(effectInstance));
             }
 
             Inventory playerInventory = player.getInventory();
             ListTag inventoryTag = new ListTag();
 
-            // Save main inventory items (slots 0-35)
             for (int i = 0; i < playerInventory.items.size(); ++i) {
                 if (!playerInventory.items.get(i).isEmpty()) {
                     CompoundTag compoundtag = new CompoundTag();
                     compoundtag.putByte("Slot", (byte) i);
-                    // Use the save method from ItemStack that takes a registry access and the output tag
                     playerInventory.items.get(i).save(player.registryAccess(), compoundtag);
                     inventoryTag.add(compoundtag);
                 }
             }
 
-            // Save armor items (slots 100-103)
+
             for (int j = 0; j < playerInventory.armor.size(); ++j) {
                 if (!playerInventory.armor.get(j).isEmpty()) {
                     CompoundTag compoundtag1 = new CompoundTag();
@@ -234,7 +200,7 @@ public class MineZero {
                 }
             }
 
-            // Save offhand item (slot 150)
+
             for (int k = 0; k < playerInventory.offhand.size(); ++k) {
                 if (!playerInventory.offhand.get(k).isEmpty()) {
                     CompoundTag compoundtag2 = new CompoundTag();
@@ -244,24 +210,23 @@ public class MineZero {
                 }
             }
 
-            // Store the completed tag in our data object
+
             pDataForNewPlayer.inventoryNBT = inventoryTag;
 
             CompoundTag advTag = new CompoundTag();
             if (player.server != null) {
                 for (AdvancementHolder advancementHolder : player.server.getAdvancements().getAllAdvancements()) {
-                    // Advancement advancement = advancementHolder.value(); // Not needed if getOrStartProgress takes Holder
                     AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancementHolder);
                     CompoundTag progressTag = new CompoundTag();
                     for (String criterion : progress.getCompletedCriteria()) {
                         progressTag.putBoolean(criterion, true);
                     }
-                    advTag.put(advancementHolder.id().toString(), progressTag); // Use holder.id()
+                    advTag.put(advancementHolder.id().toString(), progressTag);
                 }
             }
             pDataForNewPlayer.advancements = advTag;
 
-            CompoundTag playerDataNbt = pDataForNewPlayer.toNBT(lookupProvider); // Use the lookupProvider obtained earlier
+            CompoundTag playerDataNbt = pDataForNewPlayer.toNBT(lookupProvider);
             data.savePlayerData(player.getUUID(), playerDataNbt);
             LOGGER.info("[MineZero][LOGIN] Player {} added to checkpoint.", player.getName().getString());
         } else {
@@ -271,48 +236,30 @@ public class MineZero {
         }
     }
 
-    // ServerStartingEvent is on the NeoForge event bus
+
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("HELLO from server starting");
     }
 
-    // Client specific setup, on MOD event bus
+
     private void clientSetup(final FMLClientSetupEvent event) {
         LOGGER.info("HELLO FROM CLIENT SETUP (Mod Event Bus)");
 
-        // Register client-specific game event handlers to NeoForge.EVENT_BUS
+
         NeoForge.EVENT_BUS.register(ClientForgeEvents.class);
 
-        // --- CORRECTED: Use event.enqueueWork directly ---
-        // For client-side tasks that need to run on the main game thread after client setup
         event.enqueueWork(() -> {
             LOGGER.info("Performing client-side enqueued work (from clientSetup).");
-            // Example: KeyBindings.initModels(), screen registrations, renderer registrations
-            // SomeModelRegistry.registerModels();
-            // SomeScreenRegistry.registerScreens();
         });
-        // --- END CORRECTION ---
     }
-
-    // Key Mappings registration, on MOD event bus
     private void registerKeyMappings(final RegisterKeyMappingsEvent event) {
         LOGGER.info("Registering MineZero Key Mappings (Mod Event Bus)");
-
-        // Get the KeyMapping instance from the Lazy object using .get()
-        if (KeyBindings.EXAMPLE_ACTION_KEY != null) { // The Lazy object itself can be checked for null if not final, though usually it's final
-            event.register(KeyBindings.EXAMPLE_ACTION_KEY.get()); // <--- Use .get()
+        if (KeyBindings.EXAMPLE_ACTION_KEY != null) {
+            event.register(KeyBindings.EXAMPLE_ACTION_KEY.get());
         }
         if (KeyBindings.SELF_DAMAGE_KEY != null) {
-            event.register(KeyBindings.SELF_DAMAGE_KEY.get());    // <--- Use .get()
+            event.register(KeyBindings.SELF_DAMAGE_KEY.get());
         }
     }
-
-
-    // The static inner class for client events is no longer strictly necessary
-    // if its methods (clientSetup, registerKeyMappings) are moved to the main class
-    // and registered correctly on the MOD event bus with Dist.CLIENT filtering if needed,
-    // or if they are Dist-specific events like FMLClientSetupEvent.
-    // @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    // public static class ClientModEvents { ... }
 }

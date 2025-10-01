@@ -32,36 +32,19 @@ public class DeathEventHandler {
             if (server != null) {
                 CheckpointTicker.lastCheckpointTick = server.getTickCount();
             }
-
-
-
-            // Check if the player is the anchor player
             if (data.getAnchorPlayerUUID() == null || !player.getUUID().equals(data.getAnchorPlayerUUID())) {
 
-                return; // Do nothing if the player is not the anchor player
+                return;
             }
 
             event.setCanceled(true);
             level.getServer().execute(() -> {
                 CheckpointManager.restoreCheckpoint(player);
             });
-
-            // Notify all players
             level.getServer().getPlayerList().getPlayers().forEach(p -> {
-
-                //p.displayClientMessage(Component.literal("The anchor player has died! Resetting the world."), true);
-
-                // Restore their individual states
                 if (!p.getUUID().equals(data.getAnchorPlayerUUID())) {
-                    //CheckpointManager.restoreCheckpoint(p);
                 }
             });
-
-            // Cancel the death of the anchor player
-
-
-
-            // Play a chime sound
             String chime = ConfigHandler.getDeathChime();
             if ("CLASSIC".equalsIgnoreCase(chime)) {
                 playClassicChime(player);
@@ -79,30 +62,22 @@ public class DeathEventHandler {
     }
 
     private void playClassicChime(ServerPlayer player) {
-
-        // --- CORRECTED ResourceLocation ---
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "death_chime"), // Use static factory method
+                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "death_chime"),
                 SoundSource.PLAYERS
         );
-        // --- End Correction ---
 
-        if (player.connection != null) { // Good to check connection before sending packets
+        if (player.connection != null) {
             player.connection.send(stopSoundPacket);
         }
-
-        // Ensure ModSoundEvents.DEATH_CHIME.get() returns a valid SoundEvent
         player.playNotifySound(ModSoundEvents.DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
     }
 
     private void playAlternateChime(ServerPlayer player) {
-
-        // --- CORRECTED ResourceLocation ---
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "alt_death_chime"), // Use static factory method
+                ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "alt_death_chime"),
                 SoundSource.PLAYERS
         );
-        // --- End Correction ---
 
         if (player.connection != null) {
             player.connection.send(stopSoundPacket);

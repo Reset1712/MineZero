@@ -65,21 +65,15 @@ public class PlayerData {
         if (spawnDimension != null) {
             tag.putString("SpawnDimension", spawnDimension.location().toString());
         }
-
-        // Save potion effects
         ListTag effectsTag = new ListTag();
         for (MobEffectInstance effect : potionEffects) {
-            Tag effectNbtTag = effect.save(); // save() returns Tag
+            Tag effectNbtTag = effect.save();
             effectsTag.add(effectNbtTag);
         }
         tag.put("PotionEffects", effectsTag);
-
-        // Save advancements
         if (advancements != null) {
             tag.put("Advancements", advancements);
         }
-
-        // Save dimension
         if (dimension != null) {
             tag.putString("Dimension", dimension.location().toString());
         }
@@ -113,20 +107,15 @@ public class PlayerData {
         data.experienceProgress = tag.getFloat("ExperienceProgress");
 
 
-        if (tag.contains("SpawnDimension", Tag.TAG_STRING)) { // Good practice to check type with Tag.TAG_STRING (which is 8)
+        if (tag.contains("SpawnDimension", Tag.TAG_STRING)) {
             String spawnDimString = tag.getString("SpawnDimension");
             try {
-                // --- CORRECTED ResourceLocation creation ---
                 data.spawnDimension = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(spawnDimString));
-                // --- END CORRECTION ---
-            } catch (Exception e) { // Catch potential errors from ResourceLocation.parse if string is invalid
-                // PD_LOGGER.error("Failed to parse SpawnDimension ResourceLocation string: {}", spawnDimString, e);
+            } catch (Exception e) {
                 System.err.println("Failed to parse SpawnDimension ResourceLocation string: " + spawnDimString + " - " + e.getMessage());
-                data.spawnDimension = null; // Or set to a default like Level.OVERWORLD if appropriate
+                data.spawnDimension = null;
             }
         }
-
-        // Load potion effects
         data.potionEffects.clear();
         ListTag effectsTag = tag.getList("PotionEffects", 10);
         for (int i = 0; i < effectsTag.size(); i++) {
@@ -136,31 +125,22 @@ public class PlayerData {
                 data.potionEffects.add(effect);
             }
         }
-
-        // Load advancements
         if (tag.contains("Advancements")) {
             data.advancements = tag.getCompound("Advancements");
         }
-
-        // Load dimension
         if (tag.contains("Dimension", Tag.TAG_STRING)) {
             String currentDimString = tag.getString("Dimension");
             try {
-                // --- CORRECTED ResourceLocation creation ---
                 data.dimension = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(currentDimString));
-                // --- END CORRECTION ---
             } catch (Exception e) {
-                // PD_LOGGER.error("Failed to parse player Dimension ResourceLocation string: {}", currentDimString, e);
                 System.err.println("Failed to parse player Dimension ResourceLocation string: " + currentDimString + " - " + e.getMessage());
-                data.dimension = null; // Or set to a default
+                data.dimension = null;
             }
         }
 
         if (tag.contains("GameMode")) {
             data.gameMode = tag.getString("GameMode");
         }
-
-        // Use the corresponding standard helper method to load the lists.
         if (tag.contains("Inventory", Tag.TAG_LIST)) {
             data.inventoryNBT = tag.getList("Inventory", Tag.TAG_COMPOUND);
         }
