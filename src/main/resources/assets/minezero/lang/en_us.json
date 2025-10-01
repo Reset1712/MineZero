@@ -25,6 +25,9 @@
   "gamerule.artifactFluteEnabled": "Artifact Flute Enabled",
   "gamerule.artifactFluteEnabled.description": "Enable or disable the Artifact Flute feature.",
 
+  "gamerule.setCheckpointOnWorldCreation":" Set Checkpoint on World Creation",
+  "gamerule.setCheckpointOnWorldCreation.description": "Automatically set a checkpoint when a new world is created.",
+
   "_comment": "Keybinds",
   "key.categories.minezero": "MineZero Keybinds",
   "key.minezero.example_action": "Example Action",

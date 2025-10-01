@@ -151,10 +151,12 @@ public class MineZero {
         // AND no checkpoint data exists for this player yet (which would be true if they are the first)
         if (data.getAnchorPlayerUUID() == null && data.getPlayerData(player.getUUID()) == null) {
             LOGGER.info("[MineZero][LOGIN] No anchor player set and player {} is new to checkpoint. Setting initial checkpoint for this player.", player.getName().getString());
-            // This will set the current player as the anchor and save their state, effectively creating the first checkpoint.
-            CheckpointManager.setCheckpoint(player);
-            // data.setAnchorPlayerUUID(player.getUUID()); // setCheckpoint already does this
-            // data.setDirty(); // setCheckpoint calls savePlayerData which calls setDirty
+
+            // set if gamerule SET_CHECKPOINT_ON_WORLD_CREATION is true
+            if (player.level().getGameRules().getBoolean(ModGameRules.SET_CHECKPOINT_ON_WORLD_CREATION)) {
+                CheckpointManager.setCheckpoint(player);
+            }
+
             LOGGER.info("[MineZero][LOGIN] 🎯 Initial anchor and checkpoint set for {}", player.getName().getString());
         }
         // Scenario 2: An anchor player IS set, but THIS player logging in does not have data in the current checkpoint

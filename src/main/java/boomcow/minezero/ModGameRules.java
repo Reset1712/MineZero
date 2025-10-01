@@ -32,4 +32,8 @@ public class ModGameRules {
     // New gamerule to enable/disable the Artifact Flute entirely
     public static final GameRules.Key<BooleanValue> ARTIFACT_FLUTE_ENABLED =
             GameRules.register("artifactFluteEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+
+    // gamerule to enable setting checkpoint on world creation
+    public static final GameRules.Key<BooleanValue> SET_CHECKPOINT_ON_WORLD_CREATION =
+            GameRules.register("setCheckpointOnWorldCreation", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
 }
