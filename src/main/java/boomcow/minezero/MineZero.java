@@ -56,34 +56,24 @@ public class MineZero {
 
     public static final String MODID = "minezero";
     private static final Logger LOGGER = LogUtils.getLogger();
-
-    // Deferred Registers for blocks and items
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
-
-    // Block and BlockItem example
     public static final RegistryObject<Block> EXAMPLE_BLOCK = BLOCKS.register("example_block",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)));
 
     public static final RegistryObject<Item> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block",
             () -> new BlockItem(EXAMPLE_BLOCK.get(), new Item.Properties()));
-
-    // Artifact Flute Item
     public static final RegistryObject<Item> ARTIFACT_FLUTE = ITEMS.register("artifact_flute",
             () -> new ArtifactFluteItem(new Item.Properties().stacksTo(1)));
 
     public MineZero() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-
-        // Register event listeners and Deferred Registers
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
         modEventBus.addListener(this::setupNetworking);
 
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
-
-        // Register event handlers
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new DeathEventHandler());
 
@@ -106,7 +96,6 @@ public class MineZero {
     private void commonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("HELLO FROM COMMON SETUP");
         LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
-        // Force the ModGameRules class to load its static fields.
         LOGGER.info("Loading custom game rules: autoCheckpointEnabled = {}", ModGameRules.AUTO_CHECKPOINT_ENABLED);
     }
 
@@ -120,7 +109,7 @@ public class MineZero {
     }
 
     private void setupNetworking(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> { // Use enqueueWork for thread safety during setup
+        event.enqueueWork(() -> {
             PacketHandler.register();
         });
     }
@@ -140,31 +129,24 @@ public class MineZero {
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (player.level().isClientSide()) return; // Ensure we're on the server
+        if (player.level().isClientSide()) return;
 
-        ServerLevel level = player.serverLevel(); // Correct way to get ServerLevel
+        ServerLevel level = player.serverLevel();
         CheckpointData data = CheckpointData.get(level);
 
         LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) logged in.", player.getName().getString(), player.getUUID());
-
-        // Scenario 1: No anchor player set yet (e.g., first player ever on a new world)
-        // AND no checkpoint data exists for this player yet (which would be true if they are the first)
         if (data.getAnchorPlayerUUID() == null && data.getPlayerData(player.getUUID()) == null) {
             LOGGER.info("[MineZero][LOGIN] No anchor player set and player {} is new to checkpoint. Setting initial checkpoint for this player.", player.getName().getString());
-
-            // set if gamerule SET_CHECKPOINT_ON_WORLD_CREATION is true
             if (player.level().getGameRules().getBoolean(ModGameRules.SET_CHECKPOINT_ON_WORLD_CREATION)) {
                 CheckpointManager.setCheckpoint(player);
             }
 
             LOGGER.info("[MineZero][LOGIN] 🎯 Initial anchor and checkpoint set for {}", player.getName().getString());
         }
-        // Scenario 2: An anchor player IS set, but THIS player logging in does not have data in the current checkpoint
         else if (data.getPlayerData(player.getUUID()) == null) {
             LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) not found in current checkpoint data. Adding them now.", player.getName().getString(), player.getUUID());
 
             PlayerData pDataForNewPlayer = new PlayerData();
-            // Capture player's current state
             pDataForNewPlayer.posX = player.getX();
             pDataForNewPlayer.posY = player.getY();
             pDataForNewPlayer.posZ = player.getZ();
@@ -203,7 +185,7 @@ public class MineZero {
             }
 
             CompoundTag advTag = new CompoundTag();
-            if (player.server != null) { // player.server can be null during very early login stages
+            if (player.server != null) {
                 for (Advancement advancement : player.server.getAdvancements().getAllAdvancements()) {
                     AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
                     CompoundTag progressTag = new CompoundTag();
@@ -214,15 +196,10 @@ public class MineZero {
                 }
             }
             pDataForNewPlayer.advancements = advTag;
-
-            // Save this new player's data to the existing checkpoint
             data.savePlayerData(player.getUUID(), pDataForNewPlayer);
-            // data.setDirty(); // savePlayerData calls setDirty()
             LOGGER.info("[MineZero][LOGIN] Player {} added to checkpoint with their current state.", player.getName().getString());
         } else {
-            // Player is already known to the checkpoint system (either as anchor or regular player with data)
             LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) already has data in the checkpoint.", player.getName().getString(), player.getUUID());
-            // DEBUG: log both the current player UUID and the stored anchor
             LOGGER.info("[MineZero][LOGIN] Player UUID = {}, Stored Anchor = {}",
                     player.getUUID(), data.getAnchorPlayerUUID());
         }
@@ -249,7 +226,6 @@ public class MineZero {
             LOGGER.info("Registering MineZero Key Mappings");
             event.register(KeyBindings.EXAMPLE_ACTION_KEY);
             event.register(KeyBindings.SELF_DAMAGE_KEY);
-            // Register other keybindings here if you add more
         }
     }
 }

@@ -31,36 +31,19 @@ public class DeathEventHandler {
             if (server != null) {
                 CheckpointTicker.lastCheckpointTick = server.getTickCount();
             }
-
-
-
-            // Check if the player is the anchor player
             if (data.getAnchorPlayerUUID() == null || !player.getUUID().equals(data.getAnchorPlayerUUID())) {
 
-                return; // Do nothing if the player is not the anchor player
+                return;
             }
 
             event.setCanceled(true);
             level.getServer().execute(() -> {
                 CheckpointManager.restoreCheckpoint(player);
             });
-
-            // Notify all players
             level.getServer().getPlayerList().getPlayers().forEach(p -> {
-
-                //p.displayClientMessage(Component.literal("The anchor player has died! Resetting the world."), true);
-
-                // Restore their individual states
                 if (!p.getUUID().equals(data.getAnchorPlayerUUID())) {
-                    //CheckpointManager.restoreCheckpoint(p);
                 }
             });
-
-            // Cancel the death of the anchor player
-
-
-
-            // Play a chime sound
             String chime = ConfigHandler.getDeathChime();
             if ("CLASSIC".equalsIgnoreCase(chime)) {
                 playClassicChime(player);
@@ -78,16 +61,13 @@ public class DeathEventHandler {
     }
 
     private void playClassicChime(ServerPlayer player) {
-        // Stop previous death chime
         Logger logger = LogManager.getLogger();
         logger.debug("Playing classic chime");
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                new ResourceLocation("minezero", "death_chime"), // The exact sound name
+                new ResourceLocation("minezero", "death_chime"),
                 SoundSource.PLAYERS
         );
         player.connection.send(stopSoundPacket);
-
-        // Play new death chime
         player.playNotifySound(ModSoundEvents.DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
 
 
@@ -95,16 +75,13 @@ public class DeathEventHandler {
     }
 
     private void playAlternateChime(ServerPlayer player) {
-        // Stop previous death chime
         Logger logger = LogManager.getLogger();
         logger.debug("Playing alternate chime");
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
-                new ResourceLocation("minezero", "alt_death_chime"), // The exact sound name
+                new ResourceLocation("minezero", "alt_death_chime"),
                 SoundSource.PLAYERS
         );
         player.connection.send(stopSoundPacket);
-
-        // Play new death chime
         player.playNotifySound(ModSoundEvents.ALT_DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
 
 

@@ -13,15 +13,10 @@ public class ExplosionEventHandler {
     @SubscribeEvent
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
         ServerLevel level = (ServerLevel) event.getLevel();
-
-        // Get checkpoint data
         CheckpointData data = CheckpointData.get(level);
         if (data == null || data.getAnchorPlayerUUID() == null) return;
-
-        // Check if the anchor player is dead
         ServerPlayer anchorPlayer = level.getServer().getPlayerList().getPlayer(data.getAnchorPlayerUUID());
         if (anchorPlayer == null || anchorPlayer.isDeadOrDying()) {
-            // Prevent explosion from breaking blocks
             event.getAffectedBlocks().clear();
         }
     }

@@ -32,15 +32,14 @@ public class NonPlayerChangeHandler {
 
     private static WorldData getActiveWorldData(ServerLevel level) {
         if (level == null || level.getServer() == null) return null;
-        CheckpointData checkpointData = CheckpointData.get(level); // Get the global checkpoint data
-        return checkpointData.getWorldData(); // Get the WorldData instance from it
+        CheckpointData checkpointData = CheckpointData.get(level);
+        return checkpointData.getWorldData();
     }
 
     @SubscribeEvent
     public static void onFirePlaced(EntityPlaceEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         Logger logger = LogManager.getLogger();
-//        logger.info("Fire placed at: " + event.getPos());
         if (event.getPlacedBlock().getBlock() == Blocks.FIRE) {
             CheckpointData data = CheckpointData.get(level);
             long now = level.getGameTime();
@@ -54,7 +53,6 @@ public class NonPlayerChangeHandler {
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         Logger logger = LogManager.getLogger();
-//        logger.info("Explosion at: " + event.getExplosion().getPosition());
 
         CheckpointData data = CheckpointData.get(level);
         WorldData worldDataInstance = getActiveWorldData(level);
@@ -70,8 +68,6 @@ public class NonPlayerChangeHandler {
             affectedPositions.add(pos);
 
             Block block = state.getBlock();
-
-            // Door logic
             if (block instanceof DoorBlock) {
                 if (state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER) {
                     affectedPositions.add(pos.above());
@@ -79,8 +75,6 @@ public class NonPlayerChangeHandler {
                     affectedPositions.add(pos.below());
                 }
             }
-
-            // Bed logic
             else if (block instanceof BedBlock) {
                 Direction facing = state.getValue(BedBlock.FACING);
                 if (state.getValue(BedBlock.PART) == BedPart.FOOT) {
@@ -89,8 +83,6 @@ public class NonPlayerChangeHandler {
                     affectedPositions.add(pos.relative(facing.getOpposite()));
                 }
             }
-
-            // Process each block like in player break logic
             for (BlockPos currentPos : affectedPositions) {
                 if (worldDataInstance.modifiedBlocks.contains(currentPos)) {
                     worldDataInstance.modifiedBlocks.remove(currentPos);
@@ -146,7 +138,6 @@ public class NonPlayerChangeHandler {
 
 
         if (estimatedDamage >= anchorPlayer.getHealth()) {
-//            logger.info("Cancelling explosion to prevent anchor death");
             event.setCanceled(true);
             anchorPlayer.hurt(level.damageSources().explosion(anchorPlayer, null), anchorPlayer.getMaxHealth()*5);
         }

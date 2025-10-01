@@ -37,7 +37,6 @@ public class PlayerData {
     public boolean spawnForced;
 
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
-    // New field for advancements.
     public CompoundTag advancements = new CompoundTag();
 
     public CompoundTag toNBT() {
@@ -67,8 +66,6 @@ public class PlayerData {
         if (spawnDimension != null) {
             tag.putString("SpawnDimension", spawnDimension.location().toString());
         }
-
-        // Save potion effects
         ListTag effectsTag = new ListTag();
         for (MobEffectInstance effect : potionEffects) {
             CompoundTag effectTag = new CompoundTag();
@@ -76,13 +73,9 @@ public class PlayerData {
             effectsTag.add(effectTag);
         }
         tag.put("PotionEffects", effectsTag);
-
-        // Save advancements
         if (advancements != null) {
             tag.put("Advancements", advancements);
         }
-
-        // Save dimension
         if (dimension != null) {
             tag.putString("Dimension", dimension.location().toString());
         }
@@ -127,8 +120,6 @@ public class PlayerData {
         if (tag.contains("SpawnDimension")) {
             data.spawnDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("SpawnDimension")));
         }
-
-        // Load potion effects
         data.potionEffects.clear();
         ListTag effectsTag = tag.getList("PotionEffects", 10);
         for (int i = 0; i < effectsTag.size(); i++) {
@@ -138,13 +129,9 @@ public class PlayerData {
                 data.potionEffects.add(effect);
             }
         }
-
-        // Load advancements
         if (tag.contains("Advancements")) {
             data.advancements = tag.getCompound("Advancements");
         }
-
-        // Load dimension
         if (tag.contains("Dimension")) {
             data.dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("Dimension")));
         }

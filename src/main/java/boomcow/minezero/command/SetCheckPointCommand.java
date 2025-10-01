@@ -13,7 +13,7 @@ public class SetCheckPointCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("setcheckpoint")
-                        .requires(cs -> cs.hasPermission(2)) // op-level 2 required
+                        .requires(cs -> cs.hasPermission(2))
                         .executes(context -> {
                             CommandSourceStack source = context.getSource();
                             ServerPlayer player;
