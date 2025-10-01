@@ -41,6 +41,15 @@ This repository maintains multiple branches for different versions and mod loade
 
 ---
 
+## Version Status
+
+| Branch           | Loader    | MC Version | Status     |
+|------------------|-----------|------------|------------|
+| 1.20.1-forge     | Forge     | 1.20.1     | Released   |
+| 1.21.1-neoforge  | NeoForge  | 1.21.1     | Released   |
+| 1.21.1-fabric    | Fabric    | 1.21.1     | In Progress |
+| 1.12.2-forge     | Forge     | 1.12.2     | In Progress |
+
 ## Commands
 
 * `/setcheckpoint` → Sets the checkpoint for the executing player (requires OP level 2).
