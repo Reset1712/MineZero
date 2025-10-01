@@ -1,4 +1,4 @@
-package boomcow.minezero.input; // Your package
+package boomcow.minezero.input;
 
 import boomcow.minezero.MineZeroClient;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -10,27 +10,22 @@ public class KeyBindings {
 
     public static final String KEY_CATEGORY_MINEZERO = "key.categories.minezero";
 
-    // In Fabric, we directly define and initialize the KeyBinding objects.
-    // They are then registered.
-
     public static final KeyBinding EXAMPLE_ACTION_KEY;
     public static final KeyBinding SELF_DAMAGE_KEY;
 
     static {
-        // Initialize and register the key bindings
-        // KeyBinding constructor: (translationKey, type, code, category)
 
         EXAMPLE_ACTION_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.minezero.example_action", // Translation key for the key's name
-                InputUtil.Type.KEYSYM,         // Input Type (e.g., KEYSYM for keyboard, MOUSE for mouse buttons)
-                GLFW.GLFW_KEY_O,               // Default key code
-                KEY_CATEGORY_MINEZERO          // Category translation key
+                "key.minezero.example_action",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_O,
+                KEY_CATEGORY_MINEZERO
         ));
 
         SELF_DAMAGE_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.minezero.self_damage",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_R, // Default key code
+                GLFW.GLFW_KEY_R,
                 KEY_CATEGORY_MINEZERO
         ));
     }
@@ -44,8 +39,6 @@ public class KeyBindings {
      * call in your client initializer is good practice for clarity.
      */
     public static void registerKeyBindings() {
-        // The static initializer block above handles the registration when this class is loaded.
-        // This method effectively ensures the class is loaded.
-        MineZeroClient.LOGGER.info("MineZero keybindings registered."); // Assuming MineZeroClient has a public static LOGGER
+        MineZeroClient.LOGGER.info("MineZero keybindings registered.");
     }
 }

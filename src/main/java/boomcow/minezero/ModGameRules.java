@@ -1,4 +1,4 @@
-package boomcow.minezero; // Your package
+package boomcow.minezero;
 
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
@@ -9,20 +9,18 @@ import net.minecraft.world.GameRules.IntRule;
 import net.minecraft.world.GameRules.Key;
 
 public class ModGameRules {
-
-    // --- Auto Checkpoint Rules ---
     public static final Key<BooleanRule> AUTO_CHECKPOINT_ENABLED =
             GameRuleRegistry.register(
-                    Identifier.of(MineZeroMain.MOD_ID, "autoCheckpointEnabled").toString(), // Game rule names are strings
+                    Identifier.of(MineZeroMain.MOD_ID, "autoCheckpointEnabled").toString(),
                     Category.PLAYER,
-                    GameRuleFactory.createBooleanRule(true) // Default value
+                    GameRuleFactory.createBooleanRule(true)
             );
 
     public static final Key<IntRule> CHECKPOINT_FIXED_INTERVAL =
             GameRuleRegistry.register(
                     Identifier.of(MineZeroMain.MOD_ID, "checkpointFixedInterval").toString(),
                     Category.PLAYER,
-                    GameRuleFactory.createIntRule(600, 0) // Default value, minimum value
+                    GameRuleFactory.createIntRule(600, 0)
             );
 
     public static final Key<BooleanRule> USE_RANDOM_INTERVAL =
@@ -36,17 +34,15 @@ public class ModGameRules {
             GameRuleRegistry.register(
                     Identifier.of(MineZeroMain.MOD_ID, "randomCheckpointLowerBound").toString(),
                     Category.PLAYER,
-                    GameRuleFactory.createIntRule(600, 0) // Default 10 minutes, min 0
+                    GameRuleFactory.createIntRule(600, 0)
             );
 
     public static final Key<IntRule> RANDOM_CHECKPOINT_UPPER_BOUND =
             GameRuleRegistry.register(
                     Identifier.of(MineZeroMain.MOD_ID, "randomCheckpointUpperBound").toString(),
                     Category.PLAYER,
-                    GameRuleFactory.createIntRule(1200, 1) // Default 20 minutes, min 1 (must be > lower bound ideally)
+                    GameRuleFactory.createIntRule(1200, 1)
             );
-
-    // --- Artifact Flute Rules ---
     public static final Key<BooleanRule> FLUTE_COOLDOWN_ENABLED =
             GameRuleRegistry.register(
                     Identifier.of(MineZeroMain.MOD_ID, "fluteCooldownEnabled").toString(),
@@ -58,7 +54,7 @@ public class ModGameRules {
             GameRuleRegistry.register(
                     Identifier.of(MineZeroMain.MOD_ID, "fluteCooldownDuration").toString(),
                     Category.PLAYER,
-                    GameRuleFactory.createIntRule(60, 0) // Default 60 seconds, min 0
+                    GameRuleFactory.createIntRule(60, 0)
             );
 
     public static final Key<BooleanRule> ARTIFACT_FLUTE_ENABLED =
@@ -81,8 +77,6 @@ public class ModGameRules {
      * fields from your main initializer) is enough. No explicit `init()` call is needed.
      */
     public static void initialize() {
-        // Static initializers for the Keys above will handle registration.
-        // This method can be a no-op or just log that rules are set up.
         MineZeroMain.LOGGER.info("MineZero game rules registered.");
     }
 }

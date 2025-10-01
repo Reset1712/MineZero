@@ -12,7 +12,6 @@ import net.minecraft.resources.ResourceLocation;
 public class JEIMineZero implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
-        // Use the static factory method for ResourceLocation
         return ResourceLocation.fromNamespaceAndPath(MineZeroMain.MODID, "jei_plugin");
     }
 
