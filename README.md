@@ -4,6 +4,8 @@
 
 ---
 
+
+
 ## Features
 
 * **Checkpoints**
@@ -92,3 +94,12 @@ This project is licensed under the [Apache License 2.0](LICENSE).
 ## Future Plans
 
 * Expand compatibility across versions.
+
+---
+
+[![Join Discord](https://i.imgur.com/2F7fEU8.gif)](https://discord.gg/S9zrhP8e5B)
+
+## Join My Discord for Feedback & Suggestions!
+
+If you're enjoying my mod and want to help shape its future, I'd love to hear from you! Join my [Discord server](https://discord.gg/S9zrhP8e5B) to share feedback, report bugs, suggest new features, or discuss Minecraft modding. Your input is valuable and will directly influence the mod's development.
+
