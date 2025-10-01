@@ -2,8 +2,8 @@ package boomcow.minezero.event;
 
 import boomcow.minezero.MineZero;
 import boomcow.minezero.input.KeyBindings;
-import boomcow.minezero.network.PacketHandler; // Import PacketHandler
-import boomcow.minezero.network.SelfDamagePacket; // Import the packet
+import boomcow.minezero.network.PacketHandler;
+import boomcow.minezero.network.SelfDamagePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
@@ -21,22 +21,20 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
-            Minecraft mc = Minecraft.getInstance(); // Get instance once
+            Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
 
-                // Existing keybind check
                 while (KeyBindings.EXAMPLE_ACTION_KEY.consumeClick()) {
                     LOGGER.info("Example Action Key Pressed!");
                     mc.player.sendSystemMessage(Component.literal("Example Keybind Pressed!"));
                 }
 
-                // --- New Keybind Check ---
                 while (KeyBindings.SELF_DAMAGE_KEY.consumeClick()) {
                     LOGGER.debug("Self Damage Key Pressed - Sending Packet!");
-                    // Send the packet to the server
+
                     PacketHandler.INSTANCE.sendToServer(new SelfDamagePacket());
                 }
-                // --- End New Keybind Check ---
+
             }
         }
     }

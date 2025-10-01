@@ -6,34 +6,55 @@ import net.minecraft.world.level.GameRules.IntegerValue;
 
 public class ModGameRules {
 
-    public static final GameRules.Key<BooleanValue> AUTO_CHECKPOINT_ENABLED =
-            GameRules.register("autoCheckpointEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+        // Enable or disable automatic checkpoints set periodically by the server
+        // ticker.
+        // If false, no periodic checkpoints are created. Default: true
+        public static final GameRules.Key<BooleanValue> AUTO_CHECKPOINT_ENABLED = GameRules.register(
+                        "autoCheckpointEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
 
-    public static final GameRules.Key<IntegerValue> CHECKPOINT_FIXED_INTERVAL =
-            GameRules.register("checkpointFixedInterval", GameRules.Category.PLAYER, GameRules.IntegerValue.create(600));
+        // Fixed interval (in seconds) between auto-checkpoints when random interval is
+        // disabled.
+        // Default: 600 seconds (10 minutes)
+        public static final GameRules.Key<IntegerValue> CHECKPOINT_FIXED_INTERVAL = GameRules.register(
+                        "checkpointFixedInterval", GameRules.Category.PLAYER, GameRules.IntegerValue.create(600));
 
-    public static final GameRules.Key<BooleanValue> USE_RANDOM_INTERVAL =
-            GameRules.register("useRandomCheckpointInterval", GameRules.Category.PLAYER, GameRules.BooleanValue.create(false));
+        // Whether to use a randomized checkpoint interval between the lower/upper
+        // bounds below.
+        // If false, the fixed interval above is used. Default: false
+        public static final GameRules.Key<BooleanValue> USE_RANDOM_INTERVAL = GameRules.register(
+                        "useRandomCheckpointInterval", GameRules.Category.PLAYER, GameRules.BooleanValue.create(false));
 
-    public static final GameRules.Key<IntegerValue> RANDOM_CHECKPOINT_LOWER_BOUND =
-            GameRules.register("randomCheckpointLowerBound", GameRules.Category.PLAYER, GameRules.IntegerValue.create(600)); // Default: 10 minutes
+        // Lower bound (in seconds) for randomized auto-checkpoint interval.
+        // Default: 600 seconds (10 minutes)
+        public static final GameRules.Key<IntegerValue> RANDOM_CHECKPOINT_LOWER_BOUND = GameRules.register(
+                        "randomCheckpointLowerBound", GameRules.Category.PLAYER, GameRules.IntegerValue.create(600)); // Default:
+                                                                                                                      // 10
+                                                                                                                      // minutes
 
-    public static final GameRules.Key<IntegerValue> RANDOM_CHECKPOINT_UPPER_BOUND =
-            GameRules.register("randomCheckpointUpperBound", GameRules.Category.PLAYER, GameRules.IntegerValue.create(1200)); // Default: 20 minutes
+        // Upper bound (in seconds) for randomized auto-checkpoint interval.
+        // Default: 1200 seconds (20 minutes)
+        public static final GameRules.Key<IntegerValue> RANDOM_CHECKPOINT_UPPER_BOUND = GameRules.register(
+                        "randomCheckpointUpperBound", GameRules.Category.PLAYER, GameRules.IntegerValue.create(1200)); // Default:
+                                                                                                                       // 20
+                                                                                                                       // minutes
 
-    // New gamerules for the Artifact Flute cooldown.
-    public static final GameRules.Key<BooleanValue> FLUTE_COOLDOWN_ENABLED =
-            GameRules.register("fluteCooldownEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+        // Enable a cooldown on the Artifact Flute item.
+        // Default: true
+        public static final GameRules.Key<BooleanValue> FLUTE_COOLDOWN_ENABLED = GameRules.register(
+                        "fluteCooldownEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
 
-    // Duration in seconds for the cooldown.
-    public static final GameRules.Key<IntegerValue> FLUTE_COOLDOWN_DURATION =
-            GameRules.register("fluteCooldownDuration", GameRules.Category.PLAYER, GameRules.IntegerValue.create(60));
+        // Cooldown duration for the Artifact Flute (in seconds).
+        // Default: 60 seconds
+        public static final GameRules.Key<IntegerValue> FLUTE_COOLDOWN_DURATION = GameRules.register(
+                        "fluteCooldownDuration", GameRules.Category.PLAYER, GameRules.IntegerValue.create(60));
 
-    // New gamerule to enable/disable the Artifact Flute entirely
-    public static final GameRules.Key<BooleanValue> ARTIFACT_FLUTE_ENABLED =
-            GameRules.register("artifactFluteEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+        // Enable or disable the Artifact Flute item entirely.
+        // Default: true
+        public static final GameRules.Key<BooleanValue> ARTIFACT_FLUTE_ENABLED = GameRules.register(
+                        "artifactFluteEnabled", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
 
-    // gamerule to enable setting checkpoint on world creation
-    public static final GameRules.Key<BooleanValue> SET_CHECKPOINT_ON_WORLD_CREATION =
-            GameRules.register("setCheckpointOnWorldCreation", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
+        // Automatically set a checkpoint when the world is created.
+        // Default: true
+        public static final GameRules.Key<BooleanValue> SET_CHECKPOINT_ON_WORLD_CREATION = GameRules.register(
+                        "setCheckpointOnWorldCreation", GameRules.Category.PLAYER, GameRules.BooleanValue.create(true));
 }

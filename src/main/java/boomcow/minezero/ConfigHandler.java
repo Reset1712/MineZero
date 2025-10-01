@@ -33,12 +33,10 @@ public class ConfigHandler {
         }
     }
 
-    // Method to get the death chime setting
     public static String getDeathChime() {
         return COMMON.deathChime.get();
     }
 
     public static void loadConfig(ModConfig config) {
-        // Called when the config is loaded or reloaded.
     }
 }

@@ -42,7 +42,6 @@ import java.util.*;
 
 public class CheckpointManager {
 
-
     public static void setCheckpoint(ServerPlayer anchorPlayer) {
         Logger logger = LogManager.getLogger();
         logger.info("Setting checkpoint...");
@@ -50,33 +49,27 @@ public class CheckpointManager {
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
 
-
-        // Save world data
         data.saveWorldData(level);
 
-        // Set the anchor player
         data.setAnchorPlayerUUID(anchorPlayer.getUUID());
 
-        // Capture all currently online players' data
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             PlayerData pdata = new PlayerData();
-            // Store player position
+
             pdata.posX = player.getX();
             pdata.posY = player.getY();
             pdata.posZ = player.getZ();
             pdata.yaw = player.getYRot();
             pdata.pitch = player.getXRot();
-            pdata.dimension = player.level().dimension(); // Save dimension
+            pdata.dimension = player.level().dimension();
             GameType type = player.gameMode.getGameModeForPlayer();
             pdata.gameMode = type.getName().toLowerCase(Locale.ROOT);
 
-            // Using player.getDeltaMovement() which returns a Vec3
             pdata.motionX = player.getDeltaMovement().x;
             pdata.motionY = player.getDeltaMovement().y;
             pdata.motionZ = player.getDeltaMovement().z;
             pdata.fallDistance = player.fallDistance;
 
-            // Store health, hunger, xp
             pdata.health = player.getHealth();
             pdata.hunger = player.getFoodData().getFoodLevel();
             pdata.experienceLevel = player.experienceLevel;
@@ -97,14 +90,11 @@ public class CheckpointManager {
                 pdata.spawnForced = forced;
             }
 
-
-            // Store potion effects
             pdata.potionEffects.clear();
             for (MobEffectInstance effect : player.getActiveEffects()) {
                 pdata.potionEffects.add(new MobEffectInstance(effect));
             }
 
-            // Store inventory
             pdata.inventory.clear();
             for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
                 ItemStack stack = player.getInventory().getItem(i).copy();
@@ -114,15 +104,13 @@ public class CheckpointManager {
             CompoundTag advTag = new CompoundTag();
             for (Advancement advancement : player.server.getAdvancements().getAllAdvancements()) {
                 AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
-                // Create a tag to hold progress details.
+
                 CompoundTag progressTag = new CompoundTag();
 
-                // For each criterion, check if it's done.
                 for (String criterion : progress.getCompletedCriteria()) {
                     progressTag.putBoolean(criterion, true);
                 }
 
-                // Save the progress tag under the advancement's ID.
                 advTag.put(advancement.getId().toString(), progressTag);
             }
             pdata.advancements = advTag;
@@ -130,10 +118,8 @@ public class CheckpointManager {
             data.savePlayerData(player.getUUID(), pdata);
         }
 
-        // Save daytime
         data.setCheckpointDayTime(level.getDayTime());
 
-        // Save only mobs and players
         List<CompoundTag> entityList = new ArrayList<>();
         List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
         Map<UUID, UUID> entityAggroTargets = new HashMap<>();
@@ -156,10 +142,10 @@ public class CheckpointManager {
             }
         }
 
-        // Save other non-mob entities like projectiles, items, boats, etc.
         for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
             for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof Mob) continue; // Already handled above
+                if (entity instanceof Mob)
+                    continue;
 
                 if (entity instanceof AbstractMinecart ||
                         entity instanceof AreaEffectCloud ||
@@ -192,7 +178,6 @@ public class CheckpointManager {
         data.setEntityAggroTargets(entityAggroTargets);
         data.setEntityDataWithDimensions(entityList, entityDimensions);
 
-        // Save items on the ground
         List<CompoundTag> groundItemsList = new ArrayList<>();
         for (Entity entity : level.getAllEntities()) {
             if (entity instanceof ItemEntity itemEntity) {
@@ -203,7 +188,7 @@ public class CheckpointManager {
         }
         data.setGroundItems(groundItemsList);
         long endTime = System.nanoTime();
-        long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+        long durationMs = (endTime - startTime) / 1_000_000;
         logger.debug("Saving states took {} ms", durationMs);
         logger.info("Checkpoint set");
 
@@ -223,7 +208,7 @@ public class CheckpointManager {
                 logger.error("Player data is null!");
                 return;
             }
-            // Restore day time
+
             level.setDayTime(worldData.getDayTime());
 
             if (level.getLevelData() instanceof ServerLevelData serverData) {
@@ -239,9 +224,7 @@ public class CheckpointManager {
                     primaryData.setThundering(worldData.isThundering());
                 }
 
-                // Always set clear weather time
                 serverData.setClearWeatherTime(worldData.getClearTime());
-
 
                 if (worldData.isRaining()) {
                     serverData.setRainTime(worldData.getRainTime());
@@ -262,22 +245,18 @@ public class CheckpointManager {
 
             for (ServerPlayer player : level.players()) {
                 player.connection.send(new ClientboundGameEventPacket(
-                        worldData.isRaining() ? ClientboundGameEventPacket.START_RAINING : ClientboundGameEventPacket.STOP_RAINING,
-                        0.0F
-                ));
+                        worldData.isRaining() ? ClientboundGameEventPacket.START_RAINING
+                                : ClientboundGameEventPacket.STOP_RAINING,
+                        0.0F));
                 player.connection.send(new ClientboundGameEventPacket(
                         ClientboundGameEventPacket.RAIN_LEVEL_CHANGE,
-                        worldData.isRaining() ? 1.0F : 0.0F
-                ));
+                        worldData.isRaining() ? 1.0F : 0.0F));
 
                 player.connection.send(new ClientboundGameEventPacket(
                         ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE,
-                        worldData.isThundering() ? 1.0F : 0.0F
-                ));
+                        worldData.isThundering() ? 1.0F : 0.0F));
             }
 
-
-            // Restore only modified blocks to air in the correct dimensions
             for (BlockPos pos : worldData.modifiedBlocks) {
                 int dimIndex = worldData.blockDimensionIndices.get(pos);
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
@@ -290,7 +269,6 @@ public class CheckpointManager {
                 }
             }
 
-            // Restore mined blocks in the correct dimensions
             for (Map.Entry<BlockPos, BlockState> entry : worldData.minedBlocks.entrySet()) {
                 BlockPos pos = entry.getKey();
                 BlockState originalState = entry.getValue();
@@ -305,12 +283,7 @@ public class CheckpointManager {
                 }
             }
 
-
-
-            // Restore modified fluid blocks to air in the correct dimensions
-
             for (BlockPos pos : worldData.modifiedFluidBlocks) {
-
 
                 if (!worldData.blockDimensionIndices.containsKey(pos)) {
                     logger.info("No dimension index for modified fluid block at " + pos);
@@ -323,14 +296,13 @@ public class CheckpointManager {
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
                     BlockState currentState = dimLevel.getBlockState(pos);
-                    // If a fluid (or any block) is present, clear it by setting air.
+
                     if (!currentState.isAir()) {
                         dimLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
                     }
                 }
             }
 
-// Restore mined fluid blocks (i.e. fluid that was removed) in the correct dimensions
             for (Map.Entry<BlockPos, BlockState> entry : worldData.minedFluidBlocks.entrySet()) {
                 BlockPos pos = entry.getKey();
                 BlockState originalState = entry.getValue();
@@ -344,43 +316,37 @@ public class CheckpointManager {
                 ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
                 if (dimLevel != null) {
                     BlockState currentState = dimLevel.getBlockState(pos);
-                    // If the current block is air (fluid was removed), restore the original fluid state.
+
                     if (currentState.isAir()) {
                         dimLevel.setBlock(pos, originalState, 3);
                     }
                 }
             }
 
-
             int totalSaved = 0;
             int updateCount = 0;
 
-            // Assume you have a WorldData instance called worldData.
             Map<ChunkPos, List<WorldData.SavedBlock>> savedBlocksByChunk = worldData.getSavedBlocksByChunk();
 
             for (Map.Entry<ChunkPos, List<WorldData.SavedBlock>> entry : savedBlocksByChunk.entrySet()) {
                 List<WorldData.SavedBlock> savedBlocks = entry.getValue();
                 totalSaved += savedBlocks.size();
 
-                // We assume all saved blocks in this list are from the same dimension.
                 ResourceKey<Level> dimension = savedBlocks.get(0).dimension();
                 ServerLevel dimLevel = level.getServer().getLevel(dimension);
 
-                if (dimLevel == null) continue;
+                if (dimLevel == null)
+                    continue;
 
                 for (WorldData.SavedBlock saved : savedBlocks) {
                     BlockState currentState = dimLevel.getBlockState(saved.pos());
                     if (!currentState.getBlock().equals(saved.state().getBlock())) {
                         updateCount++;
-                        dimLevel.setBlock(saved.pos(), saved.state(), 2); // Use flag 2 to minimize neighbor updates.
+                        dimLevel.setBlock(saved.pos(), saved.state(), 2);
                     }
                 }
             }
 
-//            logger.debug("Total saved block states (chunked): {}", totalSaved);
-//            logger.debug("Performed {} block updates.", updateCount);
-
-            // Restore block entities in the correct dimensions
             for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
                 BlockPos pos = entry.getKey();
                 int dimIndex = worldData.blockDimensionIndices.get(pos);
@@ -395,13 +361,10 @@ public class CheckpointManager {
                 }
             }
 
-
-            // Restore all players from their saved data
             for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
                 PlayerData pdata = data.getPlayerData(player.getUUID());
                 if (pdata != null) {
-                    // Switch player to the correct dimension
-//                    logger.info("Player dimension: " + player.level().dimension() + ", Checkpoint dimension: " + pdata.dimension);
+
                     if (!player.level().dimension().equals(pdata.dimension)) {
                         ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
                         if (targetLevel != null) {
@@ -409,18 +372,16 @@ public class CheckpointManager {
                             player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
                         }
                     } else {
-                        // Restore position within the same dimension
+
                         player.setHealth(pdata.health);
                         ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
                         player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
 
                     }
 
-                    // Restore health, hunger, xp, fire ticks
                     player.getFoodData().setFoodLevel(pdata.hunger);
                     player.setExperienceLevels(pdata.experienceLevel);
-                    player.experienceProgress = pdata.experienceProgress;  // direct field access
-
+                    player.experienceProgress = pdata.experienceProgress;
 
                     player.setRemainingFireTicks(pdata.fireTicks);
                     if (pdata.gameMode != null) {
@@ -432,29 +393,23 @@ public class CheckpointManager {
                         }
                     }
 
-
                     if (pdata.spawnDimension != null) {
                         player.setRespawnPosition(
                                 pdata.spawnDimension,
-                                new BlockPos((int)pdata.spawnX, (int)pdata.spawnY, (int)pdata.spawnZ),
-                                pdata.yaw,     // or a fixed value like 0.0f
+                                new BlockPos((int) pdata.spawnX, (int) pdata.spawnY, (int) pdata.spawnZ),
+                                pdata.yaw,
                                 true,
-                                false          // update client
-                        );
+                                false);
                     }
-
-
 
                     player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));
                     player.fallDistance = pdata.fallDistance;
 
-                    // Restore potion effects
                     player.removeAllEffects();
                     for (MobEffectInstance effect : pdata.potionEffects) {
                         player.addEffect(new MobEffectInstance(effect));
                     }
 
-                    // Restore advancements exactly as saved in the checkpoint.
                     CompoundTag savedAdvTag = pdata.advancements;
                     ServerAdvancementManager advManager = level.getServer().getAdvancements();
 
@@ -477,16 +432,15 @@ public class CheckpointManager {
                             }
 
                             if (isCompleted && !wasCompleted) {
-                                // Revoke criteria gained after checkpoint.
+
                                 player.getAdvancements().revoke(advancement, criterion);
                             } else if (!isCompleted && wasCompleted) {
-                                // Award criteria that were saved in the checkpoint.
+
                                 player.getAdvancements().award(advancement, criterion);
                             }
                         }
                     }
 
-                    // Restore inventory
                     player.getInventory().clearContent();
                     for (int i = 0; i < pdata.inventory.size(); i++) {
                         player.getInventory().setItem(i, pdata.inventory.get(i));
@@ -494,26 +448,22 @@ public class CheckpointManager {
                 }
             }
 
-            // Remove all non-player entities across all dimensions
             List<Entity> entitiesToRemove = new ArrayList<>();
 
-            // Iterate over all loaded dimensions
             for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
-                // Collect non-player entities to remove
+
                 for (Entity entity : serverLevel.getAllEntities()) {
                     if (!(entity instanceof ServerPlayer) && !entity.isRemoved()) {
                         entitiesToRemove.add(entity);
                     }
                 }
-                // Remove collected entities in this dimension
+
                 for (Entity entity : entitiesToRemove) {
-                    entity.discard(); // Safely discard the entity
+                    entity.discard();
                 }
-                // Clear the list for the next dimension
+
                 entitiesToRemove.clear();
             }
-
-            // Restore mobs and players from checkpoint data
 
             List<CompoundTag> entities = data.getEntityData();
             List<ResourceKey<Level>> entityDimensions = data.getEntityDimensions();
@@ -537,7 +487,6 @@ public class CheckpointManager {
                 }
             }
 
-            // Reassign aggro targets
             for (Map.Entry<UUID, UUID> entry : entityAggroTargets.entrySet()) {
                 UUID mobUUID = entry.getKey();
                 UUID targetUUID = entry.getValue();
@@ -552,8 +501,6 @@ public class CheckpointManager {
                 }
             }
 
-
-            // Restore items on the ground
             List<CompoundTag> groundItemsList = data.getGroundItems();
             if (groundItemsList != null) {
                 for (CompoundTag itemNBT : groundItemsList) {
@@ -573,44 +520,31 @@ public class CheckpointManager {
                 }
             }
 
-
-
-
-
-
-
-
             List<WorldData.LightningStrike> strikes = worldData.getSavedLightnings();
             for (WorldData.LightningStrike strike : strikes) {
 
-                long delay = strike.tickTime - level.getGameTime(); // adjust if needed
-                if (delay < 0) delay = 1;
+                long delay = strike.tickTime - level.getGameTime();
+                if (delay < 0)
+                    delay = 1;
 
                 LightningScheduler.schedule(level, strike.pos, strike.tickTime);
 
             }
 
-            // 1. Remove new fire blocks
             for (BlockPos firePos : worldData.getNewFires()) {
                 if (level.getBlockState(firePos).getBlock() == Blocks.FIRE) {
                     level.setBlockAndUpdate(firePos, Blocks.AIR.defaultBlockState());
                 }
             }
 
-            // 2. Restore blocks destroyed by fire
-
-
-
             long endTime = System.nanoTime();
-            long durationMs = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+            long durationMs = (endTime - startTime) / 1_000_000;
             logger.debug("Restoring states took {} ms", durationMs);
-
 
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
             e.printStackTrace();
         }
     }
-
 
 }

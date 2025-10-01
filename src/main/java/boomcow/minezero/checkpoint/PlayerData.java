@@ -37,7 +37,7 @@ public class PlayerData {
     public boolean spawnForced;
 
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
-    // New field for advancements.
+
     public CompoundTag advancements = new CompoundTag();
 
     public CompoundTag toNBT() {
@@ -68,7 +68,6 @@ public class PlayerData {
             tag.putString("SpawnDimension", spawnDimension.location().toString());
         }
 
-        // Save potion effects
         ListTag effectsTag = new ListTag();
         for (MobEffectInstance effect : potionEffects) {
             CompoundTag effectTag = new CompoundTag();
@@ -77,12 +76,10 @@ public class PlayerData {
         }
         tag.put("PotionEffects", effectsTag);
 
-        // Save advancements
         if (advancements != null) {
             tag.put("Advancements", advancements);
         }
 
-        // Save dimension
         if (dimension != null) {
             tag.putString("Dimension", dimension.location().toString());
         }
@@ -94,8 +91,6 @@ public class PlayerData {
             invTag.put("Slot" + i, stackTag);
         }
         tag.put("Inventory", invTag);
-
-
 
         return tag;
     }
@@ -123,12 +118,11 @@ public class PlayerData {
         data.experienceLevel = tag.getInt("ExperienceLevel");
         data.experienceProgress = tag.getFloat("ExperienceProgress");
 
-
         if (tag.contains("SpawnDimension")) {
-            data.spawnDimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("SpawnDimension")));
+            data.spawnDimension = ResourceKey.create(Registries.DIMENSION,
+                    new ResourceLocation(tag.getString("SpawnDimension")));
         }
 
-        // Load potion effects
         data.potionEffects.clear();
         ListTag effectsTag = tag.getList("PotionEffects", 10);
         for (int i = 0; i < effectsTag.size(); i++) {
@@ -139,12 +133,10 @@ public class PlayerData {
             }
         }
 
-        // Load advancements
         if (tag.contains("Advancements")) {
             data.advancements = tag.getCompound("Advancements");
         }
 
-        // Load dimension
         if (tag.contains("Dimension")) {
             data.dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString("Dimension")));
         }

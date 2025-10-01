@@ -13,7 +13,8 @@ public class LightningStrikeListener {
 
     @SubscribeEvent
     public static void onLightningStrike(EntityJoinLevelEvent event) {
-        if (!(event.getEntity() instanceof LightningBolt) || event.getLevel().isClientSide()) return;
+        if (!(event.getEntity() instanceof LightningBolt) || event.getLevel().isClientSide())
+            return;
 
         ServerLevel level = (ServerLevel) event.getLevel();
         CheckpointData data = CheckpointData.get(level);
@@ -24,4 +25,3 @@ public class LightningStrikeListener {
         }
     }
 }
-

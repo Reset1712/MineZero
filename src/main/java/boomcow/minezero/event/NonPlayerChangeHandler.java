@@ -31,16 +31,17 @@ import java.util.UUID;
 public class NonPlayerChangeHandler {
 
     private static WorldData getActiveWorldData(ServerLevel level) {
-        if (level == null || level.getServer() == null) return null;
-        CheckpointData checkpointData = CheckpointData.get(level); // Get the global checkpoint data
-        return checkpointData.getWorldData(); // Get the WorldData instance from it
+        if (level == null || level.getServer() == null)
+            return null;
+        CheckpointData checkpointData = CheckpointData.get(level); 
+        return checkpointData.getWorldData(); 
     }
 
     @SubscribeEvent
     public static void onFirePlaced(EntityPlaceEvent event) {
-        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getLevel() instanceof ServerLevel level))
+            return;
         Logger logger = LogManager.getLogger();
-//        logger.info("Fire placed at: " + event.getPos());
         if (event.getPlacedBlock().getBlock() == Blocks.FIRE) {
             CheckpointData data = CheckpointData.get(level);
             long now = level.getGameTime();
@@ -52,9 +53,10 @@ public class NonPlayerChangeHandler {
 
     @SubscribeEvent
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
-        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getLevel() instanceof ServerLevel level))
+            return;
         Logger logger = LogManager.getLogger();
-//        logger.info("Explosion at: " + event.getExplosion().getPosition());
+ 
 
         CheckpointData data = CheckpointData.get(level);
         WorldData worldDataInstance = getActiveWorldData(level);
@@ -64,14 +66,15 @@ public class NonPlayerChangeHandler {
 
         for (BlockPos pos : event.getAffectedBlocks()) {
             BlockState state = level.getBlockState(pos);
-            if (state.isAir() || now <= data.getWorldData().getCheckpointTick()) continue;
+            if (state.isAir() || now <= data.getWorldData().getCheckpointTick())
+                continue;
 
             List<BlockPos> affectedPositions = new ArrayList<>();
             affectedPositions.add(pos);
 
             Block block = state.getBlock();
 
-            // Door logic
+     
             if (block instanceof DoorBlock) {
                 if (state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER) {
                     affectedPositions.add(pos.above());
@@ -80,7 +83,7 @@ public class NonPlayerChangeHandler {
                 }
             }
 
-            // Bed logic
+
             else if (block instanceof BedBlock) {
                 Direction facing = state.getValue(BedBlock.FACING);
                 if (state.getValue(BedBlock.PART) == BedPart.FOOT) {
@@ -90,7 +93,7 @@ public class NonPlayerChangeHandler {
                 }
             }
 
-            // Process each block like in player break logic
+    
             for (BlockPos currentPos : affectedPositions) {
                 if (worldDataInstance.modifiedBlocks.contains(currentPos)) {
                     worldDataInstance.modifiedBlocks.remove(currentPos);
@@ -114,17 +117,19 @@ public class NonPlayerChangeHandler {
         }
     }
 
-
     @SubscribeEvent
     public static void onExplosionStart(ExplosionEvent.Start event) {
-        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getLevel() instanceof ServerLevel level))
+            return;
 
         CheckpointData data = CheckpointData.get(level);
         UUID anchorUUID = data.getAnchorPlayerUUID();
-        if (anchorUUID == null) return;
+        if (anchorUUID == null)
+            return;
 
         ServerPlayer anchorPlayer = level.getServer().getPlayerList().getPlayer(anchorUUID);
-        if (anchorPlayer == null || anchorPlayer.isDeadOrDying()) return;
+        if (anchorPlayer == null || anchorPlayer.isDeadOrDying())
+            return;
 
         Explosion explosion = event.getExplosion();
         Vec3 explosionPos = explosion.getPosition();
@@ -133,7 +138,7 @@ public class NonPlayerChangeHandler {
         double distance = anchorPlayer.position().distanceTo(explosionPos);
         float seenPercent = Explosion.getSeenPercent(explosionPos, anchorPlayer);
 
-        float scaled = (1.0F - (float)(distance / (explosionRadius * 2.0F))) * seenPercent;
+        float scaled = (1.0F - (float) (distance / (explosionRadius * 2.0F))) * seenPercent;
         float estimatedDamage = (scaled * scaled + scaled) * explosionRadius * 7.0F + 1.0F;
 
         Logger logger = LogManager.getLogger();
@@ -143,15 +148,10 @@ public class NonPlayerChangeHandler {
                 String.format("%.2f", seenPercent),
                 String.format("%.2f", estimatedDamage));
 
-
-
         if (estimatedDamage >= anchorPlayer.getHealth()) {
-//            logger.info("Cancelling explosion to prevent anchor death");
             event.setCanceled(true);
-            anchorPlayer.hurt(level.damageSources().explosion(anchorPlayer, null), anchorPlayer.getMaxHealth()*5);
+            anchorPlayer.hurt(level.damageSources().explosion(anchorPlayer, null), anchorPlayer.getMaxHealth() * 5);
         }
     }
-
-
 
 }

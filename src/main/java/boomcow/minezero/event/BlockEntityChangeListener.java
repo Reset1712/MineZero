@@ -23,7 +23,6 @@ public class BlockEntityChangeListener {
     private static final Logger LOGGER_BECL = LogManager.getLogger("MineZeroBECL");
 
     private static WorldData getActiveWorldData(ServerLevel level) {
-        // ... (this helper method is fine as is)
         if (level == null || level.getServer() == null) {
             return null;
         }
@@ -34,7 +33,7 @@ public class BlockEntityChangeListener {
         return null;
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST) // Keep HIGHEST priority, it's good practice
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerInteractWithBlockEntity(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide() || !(event.getEntity() instanceof ServerPlayer player)) {
             return;
@@ -54,56 +53,39 @@ public class BlockEntityChangeListener {
             return;
         }
 
-        // --- NEW LOGIC FOR DOUBLE CHESTS ---
         if (blockEntity instanceof ChestBlockEntity) {
             BlockState blockState = level.getBlockState(pos);
             if (blockState.getBlock() instanceof ChestBlock) {
-                // Get the direction of the other half of the chest. This returns null if there is no other half.
                 Direction connectedDirection = ChestBlock.getConnectedDirection(blockState);
 
                 if (connectedDirection != null) {
                     BlockPos otherChestPos = pos.relative(connectedDirection);
                     BlockEntity otherBlockEntity = level.getBlockEntity(otherChestPos);
                     if (otherBlockEntity instanceof ChestBlockEntity) {
-                        // We found the other half. Cache it if it's not already cached.
                         LOGGER_BECL.debug("Detected double chest. Caching other half at {}.", otherChestPos);
                         cacheBlockEntityState(otherChestPos, otherBlockEntity, worldData, level);
                     }
                 }
             }
         }
-        // --- END OF NEW LOGIC ---
-
-        // Now, cache the state of the block that was actually clicked.
-        // The helper function will handle the check and logging.
         cacheBlockEntityState(pos, blockEntity, worldData, level);
     }
 
-    /**
-     * Helper function to cache the state of a single BlockEntity if it hasn't been cached yet.
-     * This avoids code duplication and makes the main listener cleaner.
-     *
-     * @param pos The position of the BlockEntity.
-     * @param blockEntity The BlockEntity instance.
-     * @param worldData The active WorldData.
-     * @param level The level the BlockEntity is in.
-     */
-    private static void cacheBlockEntityState(BlockPos pos, BlockEntity blockEntity, WorldData worldData, ServerLevel level) {
-        // Use an immutable position for map keys to ensure safety
+    private static void cacheBlockEntityState(BlockPos pos, BlockEntity blockEntity, WorldData worldData,
+            ServerLevel level) {
+
         BlockPos immutablePos = pos.immutable();
 
-        // Check if this specific block's state is already cached.
         if (worldData.getBlockEntityData().containsKey(immutablePos)) {
-            return; // Already handled, do nothing.
+            return;
         }
 
         LOGGER_BECL.info("First interaction with BlockEntity at {} post-checkpoint. Caching its state.", immutablePos);
 
-        // Save the full NBT data of the block entity
         worldData.saveBlockEntity(immutablePos, blockEntity.saveWithFullMetadata());
-        LOGGER_BECL.debug("Successfully saved BlockEntity data for {}. NBT: {}", immutablePos, blockEntity.saveWithFullMetadata().toString());
+        LOGGER_BECL.debug("Successfully saved BlockEntity data for {}. NBT: {}", immutablePos,
+                blockEntity.saveWithFullMetadata().toString());
 
-        // Also save its dimension index so it can be restored correctly
         worldData.getInstanceBlockDimensionIndices().put(immutablePos, WorldData.getDimensionIndex(level.dimension()));
     }
 }

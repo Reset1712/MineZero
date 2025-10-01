@@ -103,3 +103,9 @@ This project is licensed under the [Apache License 2.0](LICENSE).
 
 If you're enjoying my mod and want to help shape its future, I'd love to hear from you! Join my [Discord server](https://discord.gg/S9zrhP8e5B) to share feedback, report bugs, suggest new features, or discuss Minecraft modding. Your input is valuable and will directly influence the mod's development.
 
+---
+
+## Documentation
+
+- How it works: [docs/HowItWorks.md](docs/HowItWorks.md)
+
