@@ -6,6 +6,12 @@
 
 
 
+## CurseForge
+
+Get releases on CurseForge: [MineZero — Return By Death](https://www.curseforge.com/minecraft/mc-mods/mine-zero-return-by-death)
+
+---
+
 ## Features
 
 * **Checkpoints**
