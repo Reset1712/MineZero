@@ -1,27 +1,28 @@
 package boomcow.minezero.input;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.KeyMapping;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.settings.KeyConflictContext;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.input.Keyboard;
 
 public class KeyBindings {
 
     public static final String KEY_CATEGORY_MINEZERO = "key.categories.minezero";
     public static final String KEY_EXAMPLE_ACTION = "key.minezero.example_action";
-    public static final KeyMapping EXAMPLE_ACTION_KEY = new KeyMapping(
+
+    // 1.12.2 uses KeyBinding, and Keyboard.KEY_* for key codes
+    public static final KeyBinding EXAMPLE_ACTION_KEY = new KeyBinding(
             KEY_EXAMPLE_ACTION,
             KeyConflictContext.IN_GAME,
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_O,
+            Keyboard.KEY_O,
             KEY_CATEGORY_MINEZERO
     );
+
     public static final String KEY_SELF_DAMAGE = "key.minezero.self_damage";
-    public static final KeyMapping SELF_DAMAGE_KEY = new KeyMapping(
+
+    public static final KeyBinding SELF_DAMAGE_KEY = new KeyBinding(
             KEY_SELF_DAMAGE,
             KeyConflictContext.IN_GAME,
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_P,
+            Keyboard.KEY_P,
             KEY_CATEGORY_MINEZERO
     );
 }

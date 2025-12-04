@@ -3,15 +3,18 @@ package boomcow.minezero.event;
 import boomcow.minezero.ModGameRules;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraft.world.GameRules;
+import net.minecraft.world.WorldServer;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
-import java.util.concurrent.ThreadLocalRandom;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 @Mod.EventBusSubscriber
 public class CheckpointTicker {
@@ -27,28 +30,41 @@ public class CheckpointTicker {
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.START) return;
-        MinecraftServer server = event.getServer();
-        ServerLevel level = server.overworld();
+
+        // In 1.12.2, TickEvent doesn't provide the server instance directly
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
+
+        // Get Overworld (Dimension 0)
+        WorldServer level = server.getWorld(0);
         if (level == null) return;
-        var autoRule = level.getGameRules().getRule(ModGameRules.AUTO_CHECKPOINT_ENABLED);
-        if (autoRule == null) {
-            LOGGER.warn("Auto checkpoint game rule not found in world. Skipping checkpoint ticker.");
+
+        GameRules rules = level.getGameRules();
+
+        // Check if rule exists before getting boolean to avoid defaults/warnings if not initialized
+        if (!rules.hasRule(ModGameRules.AUTO_CHECKPOINT_ENABLED)) {
+            // If the rule is missing, we skip (it should be registered in ModGameRules.java)
             return;
         }
-        boolean autoEnabled = autoRule.get();
+
+        boolean autoEnabled = rules.getBoolean(ModGameRules.AUTO_CHECKPOINT_ENABLED);
         if (!autoEnabled) {
             return;
         }
-        var useRandomRule = level.getGameRules().getRule(ModGameRules.USE_RANDOM_INTERVAL);
-        boolean useRandom = useRandomRule != null && useRandomRule.get();
+
+        boolean useRandom = rules.getBoolean(ModGameRules.USE_RANDOM_INTERVAL);
 
         if (useRandom && !randomIntervalSelected) {
-            var lowerRule = level.getGameRules().getRule(ModGameRules.RANDOM_CHECKPOINT_LOWER_BOUND);
-            var upperRule = level.getGameRules().getRule(ModGameRules.RANDOM_CHECKPOINT_UPPER_BOUND);
-            int lowerSeconds = lowerRule != null ? lowerRule.get() : 600;
-            int upperSeconds = upperRule != null ? upperRule.get() : 1200;
+            int lowerSeconds = rules.getInt(ModGameRules.RANDOM_CHECKPOINT_LOWER_BOUND);
+            int upperSeconds = rules.getInt(ModGameRules.RANDOM_CHECKPOINT_UPPER_BOUND);
+
+            // Safety defaults if rules return 0 (uninitialized)
+            if (lowerSeconds == 0) lowerSeconds = 600;
+            if (upperSeconds == 0) upperSeconds = 1200;
+
             int lowerTicks = lowerSeconds * 20;
             int upperTicks = upperSeconds * 20;
+
             if (upperTicks <= lowerTicks) {
                 LOGGER.warn("Random checkpoint interval upper bound must be greater than lower bound. Using lower bound as fixed interval.");
                 intervalTicks = lowerTicks;
@@ -58,14 +74,15 @@ public class CheckpointTicker {
             }
             LOGGER.debug("Using random interval: {} ticks (lower bound: {} ticks, upper bound: {} ticks)", intervalTicks, lowerTicks, upperTicks);
         } else if (!useRandom) {
-            var fixedRule = level.getGameRules().getRule(ModGameRules.CHECKPOINT_FIXED_INTERVAL);
-            int fixedSeconds = fixedRule != null ? fixedRule.get() : 600;
+            int fixedSeconds = rules.getInt(ModGameRules.CHECKPOINT_FIXED_INTERVAL);
+            if (fixedSeconds == 0) fixedSeconds = 600; // Safety default
             intervalTicks = fixedSeconds * 20;
         }
 
-        long currentTick = server.getTickCount();
-        if (intervalTicks != nextCheckpointInterval) {
+        // Use total world time as the clock
+        long currentTick = level.getTotalWorldTime();
 
+        if (intervalTicks != nextCheckpointInterval) {
             nextCheckpointInterval = intervalTicks;
             lastCheckpointTick = currentTick;
             return;
@@ -75,26 +92,30 @@ public class CheckpointTicker {
             lastCheckpointTick = currentTick;
             return;
         }
+
         if (currentTick - lastCheckpointTick >= nextCheckpointInterval) {
             CheckpointData data = CheckpointData.get(level);
+
             if (data.getAnchorPlayerUUID() == null) {
                 if (!server.getPlayerList().getPlayers().isEmpty()) {
-                    ServerPlayer firstPlayer = server.getPlayerList().getPlayers().get(0);
-                    data.setAnchorPlayerUUID(firstPlayer.getUUID());
-
+                    // In 1.12, getPlayers returns List<EntityPlayerMP>
+                    EntityPlayerMP firstPlayer = server.getPlayerList().getPlayers().get(0);
+                    data.setAnchorPlayerUUID(firstPlayer.getUniqueID());
                 } else {
                     LOGGER.warn("No players online to set as anchor.");
                     return;
                 }
             }
-            ServerPlayer anchorPlayer = server.getPlayerList().getPlayer(data.getAnchorPlayerUUID());
-            if (anchorPlayer != null) {
 
+            EntityPlayerMP anchorPlayer = server.getPlayerList().getPlayerByUUID(data.getAnchorPlayerUUID());
+
+            if (anchorPlayer != null) {
                 CheckpointManager.setCheckpoint(anchorPlayer);
-                randomIntervalSelected = false;
+                randomIntervalSelected = false; // Reset random selection for next cycle
             } else {
                 LOGGER.warn("Anchor player not found for UUID: {}", data.getAnchorPlayerUUID());
             }
+
             lastCheckpointTick = currentTick;
             nextCheckpointInterval = intervalTicks;
             LOGGER.debug("Reset checkpoint timer: next interval {} ticks, new last tick {}", nextCheckpointInterval, lastCheckpointTick);

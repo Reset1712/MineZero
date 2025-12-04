@@ -1,56 +1,79 @@
 package boomcow.minezero.items;
 
+import boomcow.minezero.ModGameRules;
 import boomcow.minezero.ModSoundEvents;
 import boomcow.minezero.checkpoint.CheckpointManager;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import boomcow.minezero.ModGameRules;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.EnumActionResult;
+import net.minecraft.util.EnumHand;
+import net.minecraft.util.SoundCategory;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
+import net.minecraft.world.World;
 
 public class ArtifactFluteItem extends Item {
-    public ArtifactFluteItem(Properties properties) {
-        super(properties);
+
+    public ArtifactFluteItem() {
+        // In 1.12.2, properties are set directly in the constructor
+        this.setMaxStackSize(1);
+        // You typically set registry/unlocalized names here or during registration
+        // this.setCreativeTab(CreativeTabs.MISC);
     }
 
-
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        if (!level.getGameRules().getBoolean(ModGameRules.ARTIFACT_FLUTE_ENABLED)) {
-            if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-                serverPlayer.displayClientMessage(Component.literal("The Artifact Flute is currently disabled by a game rule."), false);
+    public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
+        ItemStack stack = player.getHeldItem(hand);
+
+        // Check GameRule: Enabled
+        if (!world.getGameRules().getBoolean(ModGameRules.ARTIFACT_FLUTE_ENABLED)) {
+            if (!world.isRemote && player instanceof EntityPlayerMP) {
+                // False = Chat Message
+                player.sendMessage(new TextComponentString("The Artifact Flute is currently disabled by a game rule."));
             }
-            return InteractionResultHolder.fail(player.getItemInHand(hand));
+            return new ActionResult<>(EnumActionResult.FAIL, stack);
         }
-        if (!level.isClientSide) {
-            if (player instanceof ServerPlayer serverPlayer) {
-                boolean cooldownEnabled = level.getGameRules().getBoolean(ModGameRules.FLUTE_COOLDOWN_ENABLED);
+
+        if (!world.isRemote) {
+            if (player instanceof EntityPlayerMP) {
+                EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
+
+                // Handle Cooldowns
+                boolean cooldownEnabled = world.getGameRules().getBoolean(ModGameRules.FLUTE_COOLDOWN_ENABLED);
                 if (cooldownEnabled) {
-                    int cooldownSeconds = level.getGameRules().getInt(ModGameRules.FLUTE_COOLDOWN_DURATION);
+                    // In 1.12, getInt requires the String rule name
+                    int cooldownSeconds = world.getGameRules().getInt(ModGameRules.FLUTE_COOLDOWN_DURATION);
                     int cooldownTicks = cooldownSeconds * 20;
-                    if (serverPlayer.getCooldowns().isOnCooldown(this)) {
-                        serverPlayer.displayClientMessage(Component.literal("Artifact Flute is on cooldown!"), true);
-                        return InteractionResultHolder.fail(player.getItemInHand(hand));
+
+                    if (serverPlayer.getCooldownTracker().hasCooldown(this)) {
+                        // True = Action Bar Message
+                        serverPlayer.sendStatusMessage(new TextComponentString(TextFormatting.RED + "Artifact Flute is on cooldown!"), true);
+                        return new ActionResult<>(EnumActionResult.FAIL, stack);
                     } else {
-                        serverPlayer.getCooldowns().addCooldown(this, cooldownTicks);
+                        serverPlayer.getCooldownTracker().setCooldown(this, cooldownTicks);
                     }
                 }
+
+                // Set Checkpoint
                 CheckpointManager.setCheckpoint(serverPlayer);
-                level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                        ModSoundEvents.FLUTE_CHIME.get(),
-                        SoundSource.PLAYERS,
+
+                // Play Sound
+                // Assuming ModSoundEvents.FLUTE_CHIME is a static SoundEvent field
+                world.playSound(null, player.posX, player.posY, player.posZ,
+                        ModSoundEvents.FLUTE_CHIME,
+                        SoundCategory.PLAYERS,
                         1.0f,
                         1.0f
                 );
-                serverPlayer.displayClientMessage(Component.literal("Checkpoint set using the Artifact Flute!"), true);
+
+                // Success Message (Action Bar)
+                serverPlayer.sendStatusMessage(new TextComponentString(TextFormatting.GREEN + "Checkpoint set using the Artifact Flute!"), true);
             }
         }
-        return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide);
-    }
 
+        return new ActionResult<>(EnumActionResult.SUCCESS, stack);
+    }
 }

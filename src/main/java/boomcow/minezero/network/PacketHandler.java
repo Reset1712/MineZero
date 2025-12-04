@@ -1,19 +1,18 @@
 package boomcow.minezero.network;
 
 import boomcow.minezero.MineZero;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.minecraftforge.fml.common.network.NetworkRegistry;
+import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
+import net.minecraftforge.fml.relauncher.Side;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class PacketHandler {
 
-    private static final String PROTOCOL_VERSION = "1";
-    public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(MineZero.MODID, "main"),
-            () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
-    );
+    private static final Logger LOGGER = LogManager.getLogger(MineZero.MODID);
+
+    // 1.12.2 uses SimpleNetworkWrapper instead of SimpleChannel
+    public static final SimpleNetworkWrapper INSTANCE = NetworkRegistry.INSTANCE.newSimpleChannel(MineZero.MODID);
 
     private static int packetId = 0;
     private static int id() {
@@ -22,16 +21,12 @@ public class PacketHandler {
 
     public static void register() {
         LOGGER.info("Registering MineZero network packets...");
-        INSTANCE.registerMessage(
-                id(),
-                SelfDamagePacket.class,
-                SelfDamagePacket::encode,
-                SelfDamagePacket::decode,
-                SelfDamagePacket::handle
-        );
+
+        // Register the SelfDamagePacket.
+        // 1.12.2 Syntax: registerMessage(Handler.class, Packet.class, ID, SideToHandleOn)
+        // Since clients send this to the server, we register it for Side.SERVER.
+        INSTANCE.registerMessage(SelfDamagePacket.Handler.class, SelfDamagePacket.class, id(), Side.SERVER);
 
         LOGGER.info("Finished registering {} network packets.", packetId);
-
     }
-    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 }

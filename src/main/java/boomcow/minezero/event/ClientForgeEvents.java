@@ -5,29 +5,34 @@ import boomcow.minezero.input.KeyBindings;
 import boomcow.minezero.network.PacketHandler;
 import boomcow.minezero.network.SelfDamagePacket;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.common.Mod;
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.fml.relauncher.Side;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-@Mod.EventBusSubscriber(modid = MineZero.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = MineZero.MODID, value = Side.CLIENT)
 public class ClientForgeEvents {
 
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
-            Minecraft mc = Minecraft.getInstance();
+            Minecraft mc = Minecraft.getMinecraft();
+
+            // Ensure player exists to prevent crashes in menus
             if (mc.player != null) {
-                while (KeyBindings.EXAMPLE_ACTION_KEY.consumeClick()) {
+
+                // isPressed() acts like consumeClick() in 1.12.2 (reads and resets state)
+                while (KeyBindings.EXAMPLE_ACTION_KEY.isPressed()) {
                     LOGGER.info("Example Action Key Pressed!");
-                    mc.player.sendSystemMessage(Component.literal("Example Keybind Pressed!"));
+                    mc.player.sendMessage(new TextComponentString("Example Keybind Pressed!"));
                 }
-                while (KeyBindings.SELF_DAMAGE_KEY.consumeClick()) {
+
+                while (KeyBindings.SELF_DAMAGE_KEY.isPressed()) {
                     LOGGER.debug("Self Damage Key Pressed - Sending Packet!");
                     PacketHandler.INSTANCE.sendToServer(new SelfDamagePacket());
                 }

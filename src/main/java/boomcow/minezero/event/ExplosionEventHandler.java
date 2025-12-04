@@ -1,22 +1,37 @@
 package boomcow.minezero.event;
 
 import boomcow.minezero.checkpoint.CheckpointData;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.level.ExplosionEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
+import net.minecraftforge.event.world.ExplosionEvent;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 @Mod.EventBusSubscriber
 public class ExplosionEventHandler {
 
     @SubscribeEvent
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
-        ServerLevel level = (ServerLevel) event.getLevel();
+        World world = event.getWorld();
+
+        // Ensure we are on the server side
+        if (world.isRemote || !(world instanceof WorldServer)) return;
+
+        WorldServer level = (WorldServer) world;
         CheckpointData data = CheckpointData.get(level);
+
         if (data == null || data.getAnchorPlayerUUID() == null) return;
-        ServerPlayer anchorPlayer = level.getServer().getPlayerList().getPlayer(data.getAnchorPlayerUUID());
-        if (anchorPlayer == null || anchorPlayer.isDeadOrDying()) {
+
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
+
+        EntityPlayerMP anchorPlayer = server.getPlayerList().getPlayerByUUID(data.getAnchorPlayerUUID());
+
+        // In 1.12.2, use the 'isDead' field or check health <= 0
+        if (anchorPlayer == null || anchorPlayer.isDead || anchorPlayer.getHealth() <= 0.0f) {
             event.getAffectedBlocks().clear();
         }
     }

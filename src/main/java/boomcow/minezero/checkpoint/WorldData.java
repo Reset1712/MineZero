@@ -1,23 +1,19 @@
 package boomcow.minezero.checkpoint;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.storage.ServerLevelData;
+import net.minecraft.block.state.IBlockState;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTUtil;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.management.PlayerList;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.storage.WorldInfo;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -25,14 +21,9 @@ import java.util.*;
 
 public class WorldData {
 
-
-
-
-
-
-
-
     private static final Logger LOGGER_WD = LogManager.getLogger("MineZeroWorldData");
+
+    // NBT Keys
     private static final String KEY_WD_IS_RAINING = "wd_isRaining";
     private static final String KEY_WD_IS_THUNDERING = "wd_isThundering";
     private static final String KEY_WD_RAIN_TIME = "wd_rainTime";
@@ -54,7 +45,8 @@ public class WorldData {
     private static final String KEY_WD_CREATED_PORTALS = "wd_createdPortals";
     private static final String KEY_WD_DESTROYED_PORTALS = "wd_destroyedPortals";
     private static final String KEY_WD_NEW_FIRES = "wd_newFires";
-    private static final String KEY_WD_BLOCK_STATES_LEGACY = "wd_blockStatesLegacy";
+
+    // Inner keys
     private static final String KEY_POS = "pos";
     private static final String KEY_STATE = "state";
     private static final String KEY_DIMENSION = "dimension";
@@ -67,14 +59,15 @@ public class WorldData {
     private static final String KEY_MAP_VALUE_STATE = "valueState";
     private static final String KEY_MAP_VALUE_NBT = "valueNbt";
 
+    // Legacy Support List
+    private List<IBlockState> blockStates_LEGACY = new ArrayList<>();
 
-    private List<BlockState> blockStates_LEGACY = new ArrayList<>();
     private boolean isRaining;
     private boolean isThundering;
     private int rainTime;
     private int thunderTime;
     private int clearTime;
-    private Map<BlockPos, CompoundTag> blockEntityData = new HashMap<>();
+    private Map<BlockPos, NBTTagCompound> blockEntityData = new HashMap<>();
     private Set<ChunkPos> processedChunks = new HashSet<>();
     private Map<ChunkPos, List<SavedBlock>> savedBlocksByChunk = new HashMap<>();
     private long checkpointTick;
@@ -85,16 +78,23 @@ public class WorldData {
     public final List<BlockPos> blockPositions = new ArrayList<>();
     public final Map<BlockPos, Integer> blockDimensionIndices = new HashMap<>();
     public final Set<BlockPos> modifiedBlocks = new HashSet<>();
-    public final Map<BlockPos, BlockState> minedBlocks = new HashMap<>();
+    public final Map<BlockPos, IBlockState> minedBlocks = new HashMap<>();
     public final Set<BlockPos> addedEyes = new HashSet<>();
     public final Set<BlockPos> modifiedFluidBlocks = new HashSet<>();
-    public final Map<BlockPos, BlockState> minedFluidBlocks = new HashMap<>();
+    public final Map<BlockPos, IBlockState> minedFluidBlocks = new HashMap<>();
     public final Set<BlockPos> createdPortals = new HashSet<>();
-    public final Map<BlockPos, BlockState> destroyedPortals = new HashMap<>();
+    public final Map<BlockPos, IBlockState> destroyedPortals = new HashMap<>();
     public List<BlockPos> newFires = new ArrayList<>();
 
-    private static final Map<Integer, ResourceKey<Level>> dimensionMap = new HashMap<>();
+    // 1.12.2 uses Integers for dimensions, not ResourceKeys
+    private static final Map<Integer, Integer> dimensionMap = new HashMap<>();
     private static int nextDimensionIndex = 0;
+
+    public WorldData() {
+        this.blockEntityData = new HashMap<>();
+        this.dayTime = 0;
+    }
+
     public List<BlockPos> getNewFires() {
         return newFires;
     }
@@ -107,72 +107,56 @@ public class WorldData {
         return this.checkpointTick;
     }
 
-
-
-
-
-    public WorldData() {
-        this.blockEntityData = new HashMap<>();
-        this.dayTime = 0;
-    }
-
     /**
-     * Returns an index for the given dimension, creating one if necessary.
+     * Returns an index for the given dimension ID, creating one if necessary.
      */
-    public static int getDimensionIndex(ResourceKey<Level> dimension) {
-        for (Map.Entry<Integer, ResourceKey<Level>> entry : dimensionMap.entrySet()) {
-            if (entry.getValue().equals(dimension)) {
+    public static int getDimensionIndex(int dimensionID) {
+        for (Map.Entry<Integer, Integer> entry : dimensionMap.entrySet()) {
+            if (entry.getValue().equals(dimensionID)) {
                 return entry.getKey();
             }
         }
         int newIndex = nextDimensionIndex++;
-        dimensionMap.put(newIndex, dimension);
+        dimensionMap.put(newIndex, dimensionID);
         return newIndex;
     }
 
-    public void saveWeather(ServerLevel level) {
-        Logger logger = LogManager.getLogger();
-        this.isRaining = level.isRaining();
-        this.isThundering = level.isThundering();
-
-
-        if (level.getLevelData() instanceof ServerLevelData serverData) {
-            this.rainTime = serverData.getRainTime();
-            this.thunderTime = serverData.getThunderTime();
-            this.clearTime = serverData.getClearWeatherTime();
-        }
+    public static int getDimensionFromIndex(int index) {
+        return dimensionMap.getOrDefault(index, 0); // Default to 0 (Overworld) if not found
     }
 
-    public static ResourceKey<Level> getDimensionFromIndex(int index) {
-        return dimensionMap.get(index);
+    public void saveWeather(World world) {
+        WorldInfo info = world.getWorldInfo();
+        this.isRaining = info.isRaining();
+        this.isThundering = info.isThundering();
+        this.rainTime = info.getRainTime();
+        this.thunderTime = info.getThunderTime();
+        this.clearTime = info.getCleanWeatherTime();
     }
+
 
     /**
-     * Saves a block state:
-     *  - Adds the saved block to a chunk-based map for optimized restoration.
-     *  - Updates legacy global lists/maps (blockPositions, blockStates, blockDimensionIndices) for compatibility.
+     * Saves a block state.
+     * Note: dimension is now an int (ID).
      */
-    public void saveBlockState(BlockPos pos, BlockState state, ResourceKey<Level> dimension) {
+    public void saveBlockState(BlockPos pos, IBlockState state, int dimensionID) {
         ChunkPos chunkPos = new ChunkPos(pos);
-        SavedBlock saved = new SavedBlock(pos, state, dimension);
+        SavedBlock saved = new SavedBlock(pos, state, dimensionID);
         savedBlocksByChunk.computeIfAbsent(chunkPos, k -> new ArrayList<>()).add(saved);
         blockPositions.add(pos);
         blockStates_LEGACY.add(state);
-        blockDimensionIndices.put(pos, getDimensionIndex(dimension));
+        blockDimensionIndices.put(pos, getDimensionIndex(dimensionID));
     }
 
-    /**
-     * Returns the saved blocks grouped by chunk.
-     */
     public Map<ChunkPos, List<SavedBlock>> getSavedBlocksByChunk() {
         return this.savedBlocksByChunk;
     }
 
-    public Map<BlockPos, CompoundTag> getBlockEntityData() {
+    public Map<BlockPos, NBTTagCompound> getBlockEntityData() {
         return this.blockEntityData;
     }
 
-    public void saveBlockEntity(BlockPos pos, CompoundTag blockEntityNBT) {
+    public void saveBlockEntity(BlockPos pos, NBTTagCompound blockEntityNBT) {
         if (blockEntityNBT != null) {
             this.blockEntityData.put(pos, blockEntityNBT);
         }
@@ -182,42 +166,32 @@ public class WorldData {
         this.dayTime = dayTime;
     }
 
-    public long getDayTime() {
-        return this.dayTime;
-    }
+    public long getDayTime() { return this.dayTime; }
+    public long getGameTime() { return this.gameTime; }
+    public void saveGameTime(long gameTime) { this.gameTime = gameTime; }
 
-    public long getGameTime() {
-        return this.gameTime;
-    }
+    public boolean isRaining() { return this.isRaining; }
+    public boolean isThundering() { return this.isThundering; }
+    public int getRainTime() { return this.rainTime; }
+    public int getThunderTime() { return this.thunderTime; }
+    public int getClearTime() { return this.clearTime; }
 
-    public void saveGameTime(long gameTime) {
-        this.gameTime = gameTime;
-    }
+    public List<IBlockState> getBlockStates() { return this.blockStates_LEGACY; }
+    public List<BlockPos> getBlockPositions() { return blockPositions; }
 
-    public boolean isRaining() {
-        return this.isRaining;
-    }
-    public boolean isThundering() {
-        return this.isThundering;
-    }
-    public int getRainTime() {
-        return this.rainTime;
-    }
-    public int getThunderTime() {
-        return this.thunderTime;
-    }
-    public int getClearTime() {
-        return this.clearTime;
-    }
+    public List<BlockPos> getInstanceBlockPositions() { return this.blockPositions; }
+    public Map<BlockPos, Integer> getInstanceBlockDimensionIndices() { return this.blockDimensionIndices; }
+    public Set<BlockPos> getModifiedBlocks() { return this.modifiedBlocks; }
+    public Map<BlockPos, IBlockState> getMinedBlocks() { return this.minedBlocks; }
+    public Set<BlockPos> getAddedEyes() { return this.addedEyes; }
+    public Set<BlockPos> getModifiedFluidBlocks() { return this.modifiedFluidBlocks; }
+    public Map<BlockPos, IBlockState> getMinedFluidBlocks() { return this.minedFluidBlocks; }
+    public Set<BlockPos> getCreatedPortals() { return this.createdPortals; }
+    public Map<BlockPos, IBlockState> getDestroyedPortals() { return this.destroyedPortals; }
 
-    public List<BlockState> getBlockStates() {
-        return this.blockStates_LEGACY;
-    }
-
-    public List<BlockPos> getBlockPositions() {
-        return blockPositions;
-    }
-
+    /**
+     * Lightning Strike Class (Converted from Record/Inner Class)
+     */
     public static class LightningStrike {
         public final BlockPos pos;
         public final long tickTime;
@@ -227,15 +201,15 @@ public class WorldData {
             this.tickTime = tickTime;
         }
 
-        public CompoundTag toNBT() {
-            CompoundTag tag = new CompoundTag();
-            tag.put(KEY_POS, NbtUtils.writeBlockPos(pos));
-            tag.putLong(KEY_TICK_TIME, tickTime);
+        public NBTTagCompound toNBT() {
+            NBTTagCompound tag = new NBTTagCompound();
+            tag.setTag(KEY_POS, NBTUtil.createPosTag(pos));
+            tag.setLong(KEY_TICK_TIME, tickTime);
             return tag;
         }
 
-        public static LightningStrike fromNBT(CompoundTag tag) {
-            BlockPos pos = NbtUtils.readBlockPos(tag.getCompound(KEY_POS));
+        public static LightningStrike fromNBT(NBTTagCompound tag) {
+            BlockPos pos = NBTUtil.getPosFromTag(tag.getCompoundTag(KEY_POS));
             long tickTime = tag.getLong(KEY_TICK_TIME);
             return new LightningStrike(pos, tickTime);
         }
@@ -245,7 +219,7 @@ public class WorldData {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             LightningStrike that = (LightningStrike) o;
-            return tickTime == that.tickTime && pos.equals(that.pos);
+            return tickTime == that.tickTime && Objects.equals(pos, that.pos);
         }
 
         @Override
@@ -254,38 +228,16 @@ public class WorldData {
         }
     }
 
-
-
     public void addLightningStrike(BlockPos pos, long tickTime) {
-        Logger logger = LogManager.getLogger();
         LightningStrike newStrike = new LightningStrike(pos, tickTime);
-
         if (!savedLightnings.contains(newStrike)) {
             savedLightnings.add(newStrike);
         }
     }
 
-
     public List<LightningStrike> getSavedLightnings() {
         return savedLightnings;
     }
-
-
-    public List<BlockPos> getInstanceBlockPositions() { return this.blockPositions; }
-    public Map<BlockPos, Integer> getInstanceBlockDimensionIndices() { return this.blockDimensionIndices; }
-    public Set<BlockPos> getModifiedBlocks() { return this.modifiedBlocks; }
-    public Map<BlockPos, BlockState> getMinedBlocks() { return this.minedBlocks; }
-    public Set<BlockPos> getAddedEyes() { return this.addedEyes; }
-    public Set<BlockPos> getModifiedFluidBlocks() { return this.modifiedFluidBlocks; }
-    public Map<BlockPos, BlockState> getMinedFluidBlocks() { return this.minedFluidBlocks; }
-    public Set<BlockPos> getCreatedPortals() { return this.createdPortals; }
-    public Map<BlockPos, BlockState> getDestroyedPortals() { return this.destroyedPortals; }
-
-
-
-
-
-
 
 
     /**
@@ -322,18 +274,26 @@ public class WorldData {
 
 
     /**
-     * Saves all loaded chunks within players' render distance.
-     * Blocks that are air are skipped.
+     * Saves all loaded chunks.
+     * Updated for 1.12.2 Chunk Logic using ChunkProviderServer.
      */
-    public void saveAllLoadedChunks(ServerLevel level) {
-        Logger logger = LogManager.getLogger();
-        ServerChunkCache chunkCache = level.getChunkSource();
-        final int chunkSize = 16;
-        ResourceKey<Level> currentDimension = level.dimension();
-        int renderDistance = level.getServer().getPlayerList().getViewDistance();
+    public void saveAllLoadedChunks(WorldServer world) {
+        int dimensionID = world.provider.getDimension();
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        PlayerList playerList = server.getPlayerList();
+        int renderDistance = playerList.getViewDistance();
 
-        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            BlockPos playerPos = player.blockPosition();
+        // access the server chunk provider directly
+        net.minecraft.world.gen.ChunkProviderServer chunkProvider = world.getChunkProvider();
+
+        // Iterate through players to find relevant chunks
+        for (Object obj : playerList.getPlayers()) {
+            if(!(obj instanceof net.minecraft.entity.player.EntityPlayerMP)) continue;
+            net.minecraft.entity.player.EntityPlayerMP player = (net.minecraft.entity.player.EntityPlayerMP) obj;
+
+            if (player.world.provider.getDimension() != dimensionID) continue;
+
+            BlockPos playerPos = player.getPosition();
             int playerChunkX = playerPos.getX() >> 4;
             int playerChunkZ = playerPos.getZ() >> 4;
 
@@ -342,259 +302,316 @@ public class WorldData {
                     int chunkX = playerChunkX + dx;
                     int chunkZ = playerChunkZ + dz;
 
-                    LevelChunk chunk = chunkCache.getChunkNow(chunkX, chunkZ);
+                    // In 1.12.2, getLoadedChunk returns null if the chunk isn't loaded.
+                    // This is cleaner than checking chunkExists() and then getting it.
+                    Chunk chunk = chunkProvider.getLoadedChunk(chunkX, chunkZ);
+
                     if (chunk == null) continue;
 
                     ChunkPos chunkPos = chunk.getPos();
+
                     if (!processedChunks.add(chunkPos)) continue;
-                    for (BlockPos entityPos : chunk.getBlockEntities().keySet()) {
-                        BlockEntity blockEntity = chunk.getBlockEntity(entityPos);
-                        if (blockEntity != null && !blockEntity.isRemoved()) {
-                            BlockPos immutablePos = entityPos.immutable();
-                            saveBlockEntity(immutablePos, blockEntity.saveWithFullMetadata());
-                            blockDimensionIndices.put(immutablePos, getDimensionIndex(currentDimension));
+
+                    for (Map.Entry<BlockPos, TileEntity> entry : chunk.getTileEntityMap().entrySet()) {
+                        TileEntity blockEntity = entry.getValue();
+                        if (blockEntity != null && !blockEntity.isInvalid()) {
+                            BlockPos immutablePos = entry.getKey().toImmutable();
+                            NBTTagCompound nbt = new NBTTagCompound();
+                            blockEntity.writeToNBT(nbt);
+                            saveBlockEntity(immutablePos, nbt);
+                            blockDimensionIndices.put(immutablePos, getDimensionIndex(dimensionID));
                         }
                     }
                 }
             }
         }
     }
-    public CompoundTag saveToNBT(CompoundTag nbt) {
-        nbt.putBoolean(KEY_WD_IS_RAINING, this.isRaining);
-        nbt.putBoolean(KEY_WD_IS_THUNDERING, this.isThundering);
-        nbt.putInt(KEY_WD_RAIN_TIME, this.rainTime);
-        nbt.putInt(KEY_WD_THUNDER_TIME, this.thunderTime);
-        nbt.putInt(KEY_WD_CLEAR_TIME, this.clearTime);
-        nbt.putLong(KEY_WD_CHECKPOINT_TICK, this.checkpointTick);
-        nbt.putLong(KEY_WD_DAY_TIME, this.dayTime);
-        nbt.putLong(KEY_WD_GAME_TIME, this.gameTime);
-        ListTag beListTag = new ListTag();
-        for (Map.Entry<BlockPos, CompoundTag> entry : this.blockEntityData.entrySet()) {
-            CompoundTag beEntryTag = new CompoundTag();
-            beEntryTag.put(KEY_MAP_KEY_POS, NbtUtils.writeBlockPos(entry.getKey()));
-            beEntryTag.put(KEY_MAP_VALUE_NBT, entry.getValue());
-            beListTag.add(beEntryTag);
+
+
+    public NBTTagCompound saveToNBT(NBTTagCompound nbt) {
+        nbt.setBoolean(KEY_WD_IS_RAINING, this.isRaining);
+        nbt.setBoolean(KEY_WD_IS_THUNDERING, this.isThundering);
+        nbt.setInteger(KEY_WD_RAIN_TIME, this.rainTime);
+        nbt.setInteger(KEY_WD_THUNDER_TIME, this.thunderTime);
+        nbt.setInteger(KEY_WD_CLEAR_TIME, this.clearTime);
+        nbt.setLong(KEY_WD_CHECKPOINT_TICK, this.checkpointTick);
+        nbt.setLong(KEY_WD_DAY_TIME, this.dayTime);
+        nbt.setLong(KEY_WD_GAME_TIME, this.gameTime);
+
+        NBTTagList beListTag = new NBTTagList();
+        for (Map.Entry<BlockPos, NBTTagCompound> entry : this.blockEntityData.entrySet()) {
+            NBTTagCompound beEntryTag = new NBTTagCompound();
+            beEntryTag.setTag(KEY_MAP_KEY_POS, NBTUtil.createPosTag(entry.getKey()));
+            beEntryTag.setTag(KEY_MAP_VALUE_NBT, entry.getValue());
+            beListTag.appendTag(beEntryTag);
         }
-        nbt.put(KEY_WD_BLOCK_ENTITY_DATA, beListTag);
-        ListTag savedBlocksByChunkList = new ListTag();
+        nbt.setTag(KEY_WD_BLOCK_ENTITY_DATA, beListTag);
+
+        NBTTagList savedBlocksByChunkList = new NBTTagList();
         for (Map.Entry<ChunkPos, List<SavedBlock>> entry : this.savedBlocksByChunk.entrySet()) {
-            CompoundTag chunkEntryTag = new CompoundTag();
-            chunkEntryTag.putInt(KEY_CHUNK_X, entry.getKey().x);
-            chunkEntryTag.putInt(KEY_CHUNK_Z, entry.getKey().z);
-            ListTag blocksInChunkTag = new ListTag();
+            NBTTagCompound chunkEntryTag = new NBTTagCompound();
+            chunkEntryTag.setInteger(KEY_CHUNK_X, entry.getKey().x);
+            chunkEntryTag.setInteger(KEY_CHUNK_Z, entry.getKey().z);
+            NBTTagList blocksInChunkTag = new NBTTagList();
             for (SavedBlock savedBlock : entry.getValue()) {
-                blocksInChunkTag.add(savedBlock.toNBT());
+                blocksInChunkTag.appendTag(savedBlock.toNBT());
             }
-            chunkEntryTag.put(KEY_BLOCKS_IN_CHUNK, blocksInChunkTag);
-            savedBlocksByChunkList.add(chunkEntryTag);
+            chunkEntryTag.setTag(KEY_BLOCKS_IN_CHUNK, blocksInChunkTag);
+            savedBlocksByChunkList.appendTag(chunkEntryTag);
         }
-        nbt.put(KEY_WD_SAVED_BLOCKS_BY_CHUNK, savedBlocksByChunkList);
-        ListTag lightningListTag = new ListTag();
+        nbt.setTag(KEY_WD_SAVED_BLOCKS_BY_CHUNK, savedBlocksByChunkList);
+
+        NBTTagList lightningListTag = new NBTTagList();
         for (LightningStrike strike : this.savedLightnings) {
-            lightningListTag.add(strike.toNBT());
+            lightningListTag.appendTag(strike.toNBT());
         }
-        nbt.put(KEY_WD_SAVED_LIGHTNINGS, lightningListTag);
-        ListTag bpListTag = new ListTag();
+        nbt.setTag(KEY_WD_SAVED_LIGHTNINGS, lightningListTag);
+
+        NBTTagList bpListTag = new NBTTagList();
         for (BlockPos pos : this.blockPositions) {
-            bpListTag.add(NbtUtils.writeBlockPos(pos));
+            bpListTag.appendTag(NBTUtil.createPosTag(pos));
         }
-        nbt.put(KEY_WD_BLOCK_POSITIONS, bpListTag);
-        ListTag bdiListTag = new ListTag();
+        nbt.setTag(KEY_WD_BLOCK_POSITIONS, bpListTag);
+
+        NBTTagList bdiListTag = new NBTTagList();
         for (Map.Entry<BlockPos, Integer> entry : this.blockDimensionIndices.entrySet()) {
-            CompoundTag bdiEntryTag = new CompoundTag();
-            bdiEntryTag.put(KEY_MAP_KEY_POS, NbtUtils.writeBlockPos(entry.getKey()));
-            bdiEntryTag.putInt(KEY_MAP_VALUE_INT, entry.getValue());
-            bdiListTag.add(bdiEntryTag);
+            NBTTagCompound bdiEntryTag = new NBTTagCompound();
+            bdiEntryTag.setTag(KEY_MAP_KEY_POS, NBTUtil.createPosTag(entry.getKey()));
+            bdiEntryTag.setInteger(KEY_MAP_VALUE_INT, entry.getValue());
+            bdiListTag.appendTag(bdiEntryTag);
         }
-        nbt.put(KEY_WD_BLOCK_DIMENSION_INDICES, bdiListTag);
-        ListTag mbListTag = new ListTag();
+        nbt.setTag(KEY_WD_BLOCK_DIMENSION_INDICES, bdiListTag);
+
+        NBTTagList mbListTag = new NBTTagList();
         for (BlockPos pos : this.modifiedBlocks) {
-            mbListTag.add(NbtUtils.writeBlockPos(pos));
+            mbListTag.appendTag(NBTUtil.createPosTag(pos));
         }
-        nbt.put(KEY_WD_MODIFIED_BLOCKS, mbListTag);
-        ListTag minedBListTag = new ListTag();
-        for (Map.Entry<BlockPos, BlockState> entry : this.minedBlocks.entrySet()) {
-            CompoundTag minedBEntryTag = new CompoundTag();
-            minedBEntryTag.put(KEY_MAP_KEY_POS, NbtUtils.writeBlockPos(entry.getKey()));
-            minedBEntryTag.put(KEY_MAP_VALUE_STATE, NbtUtils.writeBlockState(entry.getValue()));
-            minedBListTag.add(minedBEntryTag);
+        nbt.setTag(KEY_WD_MODIFIED_BLOCKS, mbListTag);
+
+        NBTTagList minedBListTag = new NBTTagList();
+        for (Map.Entry<BlockPos, IBlockState> entry : this.minedBlocks.entrySet()) {
+            NBTTagCompound minedBEntryTag = new NBTTagCompound();
+            minedBEntryTag.setTag(KEY_MAP_KEY_POS, NBTUtil.createPosTag(entry.getKey()));
+            NBTTagCompound stateTag = new NBTTagCompound();
+            NBTUtil.writeBlockState(stateTag, entry.getValue());
+            minedBEntryTag.setTag(KEY_MAP_VALUE_STATE, stateTag);
+            minedBListTag.appendTag(minedBEntryTag);
         }
-        nbt.put(KEY_WD_MINED_BLOCKS, minedBListTag);
-        ListTag aeListTag = new ListTag();
+        nbt.setTag(KEY_WD_MINED_BLOCKS, minedBListTag);
+
+        NBTTagList aeListTag = new NBTTagList();
         for (BlockPos pos : this.addedEyes) {
-            aeListTag.add(NbtUtils.writeBlockPos(pos));
+            aeListTag.appendTag(NBTUtil.createPosTag(pos));
         }
-        nbt.put(KEY_WD_ADDED_EYES, aeListTag);
-        ListTag mfbListTag = new ListTag();
+        nbt.setTag(KEY_WD_ADDED_EYES, aeListTag);
+
+        NBTTagList mfbListTag = new NBTTagList();
         for (BlockPos pos : this.modifiedFluidBlocks) {
-            mfbListTag.add(NbtUtils.writeBlockPos(pos));
+            mfbListTag.appendTag(NBTUtil.createPosTag(pos));
         }
-        nbt.put(KEY_WD_MODIFIED_FLUID_BLOCKS, mfbListTag);
-        ListTag minedFbListTag = new ListTag();
-        for (Map.Entry<BlockPos, BlockState> entry : this.minedFluidBlocks.entrySet()) {
-            CompoundTag minedFbEntryTag = new CompoundTag();
-            minedFbEntryTag.put(KEY_MAP_KEY_POS, NbtUtils.writeBlockPos(entry.getKey()));
-            minedFbEntryTag.put(KEY_MAP_VALUE_STATE, NbtUtils.writeBlockState(entry.getValue()));
-            minedFbListTag.add(minedFbEntryTag);
+        nbt.setTag(KEY_WD_MODIFIED_FLUID_BLOCKS, mfbListTag);
+
+        NBTTagList minedFbListTag = new NBTTagList();
+        for (Map.Entry<BlockPos, IBlockState> entry : this.minedFluidBlocks.entrySet()) {
+            NBTTagCompound minedFbEntryTag = new NBTTagCompound();
+            minedFbEntryTag.setTag(KEY_MAP_KEY_POS, NBTUtil.createPosTag(entry.getKey()));
+            NBTTagCompound stateTag = new NBTTagCompound();
+            NBTUtil.writeBlockState(stateTag, entry.getValue());
+            minedFbEntryTag.setTag(KEY_MAP_VALUE_STATE, stateTag);
+            minedFbListTag.appendTag(minedFbEntryTag);
         }
-        nbt.put(KEY_WD_MINED_FLUID_BLOCKS, minedFbListTag);
-        ListTag cpListTag = new ListTag();
+        nbt.setTag(KEY_WD_MINED_FLUID_BLOCKS, minedFbListTag);
+
+        NBTTagList cpListTag = new NBTTagList();
         for (BlockPos pos : this.createdPortals) {
-            cpListTag.add(NbtUtils.writeBlockPos(pos));
+            cpListTag.appendTag(NBTUtil.createPosTag(pos));
         }
-        nbt.put(KEY_WD_CREATED_PORTALS, cpListTag);
-        ListTag dpListTag = new ListTag();
-        for (Map.Entry<BlockPos, BlockState> entry : this.destroyedPortals.entrySet()) {
-            CompoundTag dpEntryTag = new CompoundTag();
-            dpEntryTag.put(KEY_MAP_KEY_POS, NbtUtils.writeBlockPos(entry.getKey()));
-            dpEntryTag.put(KEY_MAP_VALUE_STATE, NbtUtils.writeBlockState(entry.getValue()));
-            dpListTag.add(dpEntryTag);
+        nbt.setTag(KEY_WD_CREATED_PORTALS, cpListTag);
+
+        NBTTagList dpListTag = new NBTTagList();
+        for (Map.Entry<BlockPos, IBlockState> entry : this.destroyedPortals.entrySet()) {
+            NBTTagCompound dpEntryTag = new NBTTagCompound();
+            dpEntryTag.setTag(KEY_MAP_KEY_POS, NBTUtil.createPosTag(entry.getKey()));
+            NBTTagCompound stateTag = new NBTTagCompound();
+            NBTUtil.writeBlockState(stateTag, entry.getValue());
+            dpEntryTag.setTag(KEY_MAP_VALUE_STATE, stateTag);
+            dpListTag.appendTag(dpEntryTag);
         }
-        nbt.put(KEY_WD_DESTROYED_PORTALS, dpListTag);
-        ListTag nfListTag = new ListTag();
+        nbt.setTag(KEY_WD_DESTROYED_PORTALS, dpListTag);
+
+        NBTTagList nfListTag = new NBTTagList();
         for (BlockPos pos : this.newFires) {
-            nfListTag.add(NbtUtils.writeBlockPos(pos));
+            nfListTag.appendTag(NBTUtil.createPosTag(pos));
         }
-        nbt.put(KEY_WD_NEW_FIRES, nfListTag);
+        nbt.setTag(KEY_WD_NEW_FIRES, nfListTag);
 
         LOGGER_WD.debug("WorldData instance saved to NBT.");
         return nbt;
     }
 
-    public void loadFromNBT(CompoundTag nbt) {
+    public void loadFromNBT(NBTTagCompound nbt) {
         this.isRaining = nbt.getBoolean(KEY_WD_IS_RAINING);
         this.isThundering = nbt.getBoolean(KEY_WD_IS_THUNDERING);
-        this.rainTime = nbt.getInt(KEY_WD_RAIN_TIME);
-        this.thunderTime = nbt.getInt(KEY_WD_THUNDER_TIME);
-        this.clearTime = nbt.getInt(KEY_WD_CLEAR_TIME);
+        this.rainTime = nbt.getInteger(KEY_WD_RAIN_TIME);
+        this.thunderTime = nbt.getInteger(KEY_WD_THUNDER_TIME);
+        this.clearTime = nbt.getInteger(KEY_WD_CLEAR_TIME);
         this.checkpointTick = nbt.getLong(KEY_WD_CHECKPOINT_TICK);
         this.dayTime = nbt.getLong(KEY_WD_DAY_TIME);
         this.gameTime = nbt.getLong(KEY_WD_GAME_TIME);
+
         this.blockEntityData.clear();
-        if (nbt.contains(KEY_WD_BLOCK_ENTITY_DATA, Tag.TAG_LIST)) {
-            ListTag beListTag = nbt.getList(KEY_WD_BLOCK_ENTITY_DATA, Tag.TAG_COMPOUND);
-            for (int i = 0; i < beListTag.size(); i++) {
-                CompoundTag beEntryTag = beListTag.getCompound(i);
-                BlockPos pos = NbtUtils.readBlockPos(beEntryTag.getCompound(KEY_MAP_KEY_POS));
-                CompoundTag valueNbt = beEntryTag.getCompound(KEY_MAP_VALUE_NBT);
+        if (nbt.hasKey(KEY_WD_BLOCK_ENTITY_DATA, 9)) { // 9 is List
+            NBTTagList beListTag = nbt.getTagList(KEY_WD_BLOCK_ENTITY_DATA, 10); // 10 is Compound
+            for (int i = 0; i < beListTag.tagCount(); i++) {
+                NBTTagCompound beEntryTag = beListTag.getCompoundTagAt(i);
+                BlockPos pos = NBTUtil.getPosFromTag(beEntryTag.getCompoundTag(KEY_MAP_KEY_POS));
+                NBTTagCompound valueNbt = beEntryTag.getCompoundTag(KEY_MAP_VALUE_NBT);
                 this.blockEntityData.put(pos, valueNbt);
             }
         }
+
         this.savedBlocksByChunk.clear();
-        if (nbt.contains(KEY_WD_SAVED_BLOCKS_BY_CHUNK, Tag.TAG_LIST)) {
-            ListTag savedBlocksByChunkList = nbt.getList(KEY_WD_SAVED_BLOCKS_BY_CHUNK, Tag.TAG_COMPOUND);
-            for (int i = 0; i < savedBlocksByChunkList.size(); i++) {
-                CompoundTag chunkEntryTag = savedBlocksByChunkList.getCompound(i);
-                ChunkPos chunkPos = new ChunkPos(chunkEntryTag.getInt(KEY_CHUNK_X), chunkEntryTag.getInt(KEY_CHUNK_Z));
-                ListTag blocksInChunkTag = chunkEntryTag.getList(KEY_BLOCKS_IN_CHUNK, Tag.TAG_COMPOUND);
+        if (nbt.hasKey(KEY_WD_SAVED_BLOCKS_BY_CHUNK, 9)) {
+            NBTTagList savedBlocksByChunkList = nbt.getTagList(KEY_WD_SAVED_BLOCKS_BY_CHUNK, 10);
+            for (int i = 0; i < savedBlocksByChunkList.tagCount(); i++) {
+                NBTTagCompound chunkEntryTag = savedBlocksByChunkList.getCompoundTagAt(i);
+                ChunkPos chunkPos = new ChunkPos(chunkEntryTag.getInteger(KEY_CHUNK_X), chunkEntryTag.getInteger(KEY_CHUNK_Z));
+                NBTTagList blocksInChunkTag = chunkEntryTag.getTagList(KEY_BLOCKS_IN_CHUNK, 10);
                 List<SavedBlock> blocks = new ArrayList<>();
-                for (int j = 0; j < blocksInChunkTag.size(); j++) {
-                    blocks.add(SavedBlock.fromNBT(blocksInChunkTag.getCompound(j)));
+                for (int j = 0; j < blocksInChunkTag.tagCount(); j++) {
+                    blocks.add(SavedBlock.fromNBT(blocksInChunkTag.getCompoundTagAt(j)));
                 }
                 this.savedBlocksByChunk.put(chunkPos, blocks);
             }
         }
+
         this.savedLightnings.clear();
-        if (nbt.contains(KEY_WD_SAVED_LIGHTNINGS, Tag.TAG_LIST)) {
-            ListTag lightningListTag = nbt.getList(KEY_WD_SAVED_LIGHTNINGS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < lightningListTag.size(); i++) {
-                this.savedLightnings.add(LightningStrike.fromNBT(lightningListTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_SAVED_LIGHTNINGS, 9)) {
+            NBTTagList lightningListTag = nbt.getTagList(KEY_WD_SAVED_LIGHTNINGS, 10);
+            for (int i = 0; i < lightningListTag.tagCount(); i++) {
+                this.savedLightnings.add(LightningStrike.fromNBT(lightningListTag.getCompoundTagAt(i)));
             }
         }
+
         this.blockPositions.clear();
-        if (nbt.contains(KEY_WD_BLOCK_POSITIONS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_BLOCK_POSITIONS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.blockPositions.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_BLOCK_POSITIONS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_BLOCK_POSITIONS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) this.blockPositions.add(NBTUtil.getPosFromTag(listTag.getCompoundTagAt(i)));
         }
 
         this.blockDimensionIndices.clear();
-        if (nbt.contains(KEY_WD_BLOCK_DIMENSION_INDICES, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_BLOCK_DIMENSION_INDICES, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) {
-                CompoundTag entryTag = listTag.getCompound(i);
-                this.blockDimensionIndices.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), entryTag.getInt(KEY_MAP_VALUE_INT));
+        if (nbt.hasKey(KEY_WD_BLOCK_DIMENSION_INDICES, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_BLOCK_DIMENSION_INDICES, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) {
+                NBTTagCompound entryTag = listTag.getCompoundTagAt(i);
+                this.blockDimensionIndices.put(NBTUtil.getPosFromTag(entryTag.getCompoundTag(KEY_MAP_KEY_POS)), entryTag.getInteger(KEY_MAP_VALUE_INT));
             }
         }
 
         this.modifiedBlocks.clear();
-        if (nbt.contains(KEY_WD_MODIFIED_BLOCKS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_MODIFIED_BLOCKS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.modifiedBlocks.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_MODIFIED_BLOCKS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_MODIFIED_BLOCKS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) this.modifiedBlocks.add(NBTUtil.getPosFromTag(listTag.getCompoundTagAt(i)));
         }
 
         this.minedBlocks.clear();
-        if (nbt.contains(KEY_WD_MINED_BLOCKS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_MINED_BLOCKS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) {
-                CompoundTag entryTag = listTag.getCompound(i);
-                this.minedBlocks.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), entryTag.getCompound(KEY_MAP_VALUE_STATE)));
+        if (nbt.hasKey(KEY_WD_MINED_BLOCKS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_MINED_BLOCKS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) {
+                NBTTagCompound entryTag = listTag.getCompoundTagAt(i);
+                this.minedBlocks.put(NBTUtil.getPosFromTag(entryTag.getCompoundTag(KEY_MAP_KEY_POS)), NBTUtil.readBlockState(entryTag.getCompoundTag(KEY_MAP_VALUE_STATE)));
             }
         }
 
         this.addedEyes.clear();
-        if (nbt.contains(KEY_WD_ADDED_EYES, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_ADDED_EYES, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.addedEyes.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_ADDED_EYES, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_ADDED_EYES, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) this.addedEyes.add(NBTUtil.getPosFromTag(listTag.getCompoundTagAt(i)));
         }
 
         this.modifiedFluidBlocks.clear();
-        if (nbt.contains(KEY_WD_MODIFIED_FLUID_BLOCKS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_MODIFIED_FLUID_BLOCKS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.modifiedFluidBlocks.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_MODIFIED_FLUID_BLOCKS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_MODIFIED_FLUID_BLOCKS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) this.modifiedFluidBlocks.add(NBTUtil.getPosFromTag(listTag.getCompoundTagAt(i)));
         }
 
         this.minedFluidBlocks.clear();
-        if (nbt.contains(KEY_WD_MINED_FLUID_BLOCKS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_MINED_FLUID_BLOCKS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) {
-                CompoundTag entryTag = listTag.getCompound(i);
-                this.minedFluidBlocks.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), entryTag.getCompound(KEY_MAP_VALUE_STATE)));
+        if (nbt.hasKey(KEY_WD_MINED_FLUID_BLOCKS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_MINED_FLUID_BLOCKS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) {
+                NBTTagCompound entryTag = listTag.getCompoundTagAt(i);
+                this.minedFluidBlocks.put(NBTUtil.getPosFromTag(entryTag.getCompoundTag(KEY_MAP_KEY_POS)), NBTUtil.readBlockState(entryTag.getCompoundTag(KEY_MAP_VALUE_STATE)));
             }
         }
 
         this.createdPortals.clear();
-        if (nbt.contains(KEY_WD_CREATED_PORTALS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_CREATED_PORTALS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.createdPortals.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_CREATED_PORTALS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_CREATED_PORTALS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) this.createdPortals.add(NBTUtil.getPosFromTag(listTag.getCompoundTagAt(i)));
         }
 
         this.destroyedPortals.clear();
-        if (nbt.contains(KEY_WD_DESTROYED_PORTALS, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_DESTROYED_PORTALS, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) {
-                CompoundTag entryTag = listTag.getCompound(i);
-                this.destroyedPortals.put(NbtUtils.readBlockPos(entryTag.getCompound(KEY_MAP_KEY_POS)), NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), entryTag.getCompound(KEY_MAP_VALUE_STATE)));
+        if (nbt.hasKey(KEY_WD_DESTROYED_PORTALS, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_DESTROYED_PORTALS, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) {
+                NBTTagCompound entryTag = listTag.getCompoundTagAt(i);
+                this.destroyedPortals.put(NBTUtil.getPosFromTag(entryTag.getCompoundTag(KEY_MAP_KEY_POS)), NBTUtil.readBlockState(entryTag.getCompoundTag(KEY_MAP_VALUE_STATE)));
             }
         }
 
         this.newFires.clear();
-        if (nbt.contains(KEY_WD_NEW_FIRES, Tag.TAG_LIST)) {
-            ListTag listTag = nbt.getList(KEY_WD_NEW_FIRES, Tag.TAG_COMPOUND);
-            for (int i = 0; i < listTag.size(); i++) this.newFires.add(NbtUtils.readBlockPos(listTag.getCompound(i)));
+        if (nbt.hasKey(KEY_WD_NEW_FIRES, 9)) {
+            NBTTagList listTag = nbt.getTagList(KEY_WD_NEW_FIRES, 10);
+            for (int i = 0; i < listTag.tagCount(); i++) this.newFires.add(NBTUtil.getPosFromTag(listTag.getCompoundTagAt(i)));
         }
 
         LOGGER_WD.debug("WorldData instance loaded from NBT.");
     }
 
-
     /**
-     * Record to store saved block data.
+     * SavedBlock Class (Converted from Java Record)
      */
-    public static record SavedBlock(BlockPos pos, BlockState state, ResourceKey<Level> dimension) {
+    public static class SavedBlock {
+        public final BlockPos pos;
+        public final IBlockState state;
+        public final int dimension; // In 1.12.2, dimensions are IDs (integers)
 
-        public CompoundTag toNBT() {
-            CompoundTag tag = new CompoundTag();
-            tag.put(KEY_POS, NbtUtils.writeBlockPos(pos));
-            tag.put(KEY_STATE, NbtUtils.writeBlockState(state));
-            tag.putString(KEY_DIMENSION, dimension.location().toString());
+        public SavedBlock(BlockPos pos, IBlockState state, int dimension) {
+            this.pos = pos;
+            this.state = state;
+            this.dimension = dimension;
+        }
+
+        public NBTTagCompound toNBT() {
+            NBTTagCompound tag = new NBTTagCompound();
+            tag.setTag(KEY_POS, NBTUtil.createPosTag(pos));
+            NBTTagCompound stateTag = new NBTTagCompound();
+            NBTUtil.writeBlockState(stateTag, state);
+            tag.setTag(KEY_STATE, stateTag);
+            tag.setInteger(KEY_DIMENSION, dimension);
             return tag;
         }
 
-        public static SavedBlock fromNBT(CompoundTag tag) {
-            BlockPos pos = NbtUtils.readBlockPos(tag.getCompound(KEY_POS));
-            BlockState state = NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), tag.getCompound(KEY_STATE));
-            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(tag.getString(KEY_DIMENSION)));
+        public static SavedBlock fromNBT(NBTTagCompound tag) {
+            BlockPos pos = NBTUtil.getPosFromTag(tag.getCompoundTag(KEY_POS));
+            IBlockState state = NBTUtil.readBlockState(tag.getCompoundTag(KEY_STATE));
+            int dimension = tag.getInteger(KEY_DIMENSION);
             return new SavedBlock(pos, state, dimension);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SavedBlock that = (SavedBlock) o;
+            return dimension == that.dimension &&
+                    Objects.equals(pos, that.pos) &&
+                    Objects.equals(state, that.state);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(pos, state, dimension);
         }
     }
 }

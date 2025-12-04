@@ -29,6 +29,8 @@ compileJava {
 minecraft {
     mappings channel: "stable", version: "39-1.12"
 
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
     runs {
         "client" {
             workingDirectory file("./run")
@@ -62,7 +64,8 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:1.12.2-14.23.5.2860"
     // compile against the JEI API but do not include it at runtime
-    compileOnly fg.deobf("mezz.jei:jei_1.12.2:4.16.1.302")
+    compileOnly fg.deobf("mezz.jei:jei_1.12.2:4.16.1.302:api")
+    runtimeOnly fg.deobf("mezz.jei:jei_1.12.2:4.16.1.302")
 }
 
 processResources {

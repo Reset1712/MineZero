@@ -1,41 +1,45 @@
 package boomcow.minezero;
 
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.config.ModConfig;
-import org.apache.commons.lang3.tuple.Pair;
+import net.minecraftforge.common.config.Config;
+import net.minecraftforge.common.config.ConfigManager;
+import net.minecraftforge.fml.client.event.ConfigChangedEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
+@Config(modid = MineZero.MODID)
+@Mod.EventBusSubscriber(modid = MineZero.MODID)
 public class ConfigHandler {
 
-    public static final ForgeConfigSpec COMMON_CONFIG;
-    public static final CommonConfig COMMON;
+    @Config.Comment("General settings")
+    public static General general = new General();
 
-    static {
-        Pair<CommonConfig, ForgeConfigSpec> commonPair = new ForgeConfigSpec.Builder().configure(CommonConfig::new);
-        COMMON_CONFIG = commonPair.getRight();
-        COMMON = commonPair.getLeft();
+    @Config.Comment("Checkpoint settings")
+    public static Checkpoints checkpoints = new Checkpoints();
+
+    public static class General {
+        @Config.Comment("Death Chime Options: CLASSIC, ALTERNATE")
+        @Config.Name("deathChime")
+        public String deathChime = "CLASSIC";
     }
 
-    public static class CommonConfig {
-        public final ForgeConfigSpec.ConfigValue<String> deathChime;
-
-        public CommonConfig(ForgeConfigSpec.Builder builder) {
-            builder.comment("General settings").push("general");
-
-            deathChime = builder
-                    .comment("Death Chime Options: CLASSIC, ALTERNATE")
-                    .define("deathChime", "CLASSIC");
-
-            builder.pop();
-
-            builder.comment("Checkpoint settings").push("checkpoints");
-
-            builder.pop();
-        }
+    public static class Checkpoints {
+        // Add checkpoint specific config fields here in the future
     }
+
+    /**
+     * Helper method to maintain API compatibility with the rest of the port.
+     */
     public static String getDeathChime() {
-        return COMMON.deathChime.get();
+        return general.deathChime;
     }
 
-    public static void loadConfig(ModConfig config) {
+    /**
+     * Syncs the config when changed from the in-game GUI.
+     */
+    @SubscribeEvent
+    public static void onConfigChanged(ConfigChangedEvent.OnConfigChangedEvent event) {
+        if (event.getModID().equals(MineZero.MODID)) {
+            ConfigManager.sync(MineZero.MODID, Config.Type.INSTANCE);
+        }
     }
 }

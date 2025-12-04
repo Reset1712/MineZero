@@ -1,32 +1,22 @@
 package boomcow.minezero.compat;
 
-import boomcow.minezero.MineZero;
 import mezz.jei.api.IModPlugin;
-import mezz.jei.api.JeiPlugin;
-import mezz.jei.api.registration.IGuiHandlerRegistration;
-import mezz.jei.api.registration.IRecipeCategoryRegistration;
-import mezz.jei.api.registration.IRecipeRegistration;
-import net.minecraft.resources.ResourceLocation;
+import mezz.jei.api.IModRegistry;
+import mezz.jei.api.JEIPlugin; // FIX: Change JeiPlugin to JEIPlugin
+import mezz.jei.api.recipe.IRecipeCategoryRegistration;
 
-@JeiPlugin
+// FIX: Change @JeiPlugin to @JEIPlugin
+@JEIPlugin
 public class JEIMineZero implements IModPlugin {
+
     @Override
-    public ResourceLocation getPluginUid() {
-        return new ResourceLocation(MineZero.MODID, "jei_plugin");
+    public void registerCategories(IRecipeCategoryRegistration registry) {
+        // Register categories here
     }
 
     @Override
-    public void registerCategories(IRecipeCategoryRegistration registration) {
-        IModPlugin.super.registerCategories(registration);
-    }
-
-    @Override
-    public void registerRecipes(IRecipeRegistration registration) {
-        IModPlugin.super.registerRecipes(registration);
-    }
-
-    @Override
-    public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-        IModPlugin.super.registerGuiHandlers(registration);
+    public void register(IModRegistry registry) {
+        // Register recipes here
+        // Example: registry.handleRecipes(MyRecipe.class, recipe -> new MyRecipeWrapper(recipe), MyRecipeCategory.UID);
     }
 }

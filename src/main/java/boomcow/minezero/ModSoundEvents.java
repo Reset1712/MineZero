@@ -1,28 +1,46 @@
 package boomcow.minezero;
 
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.SoundEvent;
+import net.minecraftforge.event.RegistryEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
+@Mod.EventBusSubscriber(modid = MineZero.MODID)
 public class ModSoundEvents {
-    public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
-            DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MineZero.MODID);
 
-    public static final RegistryObject<SoundEvent> DEATH_CHIME = SOUND_EVENTS.register("death_chime",
-            () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "death_chime")));
+    // Public static fields to be populated during registration
+    public static SoundEvent DEATH_CHIME;
+    public static SoundEvent ALT_DEATH_CHIME;
+    public static SoundEvent EMPTY_SOUND;
+    public static SoundEvent FLUTE_CHIME;
 
-    public static final RegistryObject<SoundEvent> ALT_DEATH_CHIME = SOUND_EVENTS.register("alt_death_chime",
-            () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "alt_death_chime")));
-    public static final RegistryObject<SoundEvent> EMPTY_SOUND = SOUND_EVENTS.register("empty_sound",
-            () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "empty_sound")));
+    /**
+     * Event handler for registering SoundEvents.
+     * This method is called automatically by Forge during startup.
+     */
+    @SubscribeEvent
+    public static void registerSounds(RegistryEvent.Register<SoundEvent> event) {
+        DEATH_CHIME = createSound("death_chime");
+        ALT_DEATH_CHIME = createSound("alt_death_chime");
+        EMPTY_SOUND = createSound("empty_sound");
+        FLUTE_CHIME = createSound("flute_chime");
 
-    public static final RegistryObject<SoundEvent> FLUTE_CHIME = SOUND_EVENTS.register("flute_chime",
-            () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MineZero.MODID, "flute_chime")));
+        event.getRegistry().registerAll(
+                DEATH_CHIME,
+                ALT_DEATH_CHIME,
+                EMPTY_SOUND,
+                FLUTE_CHIME
+        );
+    }
 
-    public static void register(IEventBus eventBus) {
-        SOUND_EVENTS.register(eventBus);
+    /**
+     * Helper method to create a SoundEvent and set its registry name.
+     */
+    private static SoundEvent createSound(String name) {
+        ResourceLocation location = new ResourceLocation(MineZero.MODID, name);
+        SoundEvent sound = new SoundEvent(location);
+        sound.setRegistryName(location);
+        return sound;
     }
 }

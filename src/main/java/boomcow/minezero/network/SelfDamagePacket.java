@@ -1,61 +1,88 @@
 package boomcow.minezero.network;
 
-import com.mojang.logging.LogUtils;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.network.NetworkEvent;
-import org.slf4j.Logger;
+import com.google.common.collect.Multimap;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
+import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.util.function.Supplier;
+import java.util.Collection;
 
-public class SelfDamagePacket {
+public class SelfDamagePacket implements IMessage {
 
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
 
     public SelfDamagePacket() {
+        // Empty constructor required for IMessage
     }
 
-    public static void encode(SelfDamagePacket msg, FriendlyByteBuf buf) {
+    @Override
+    public void fromBytes(ByteBuf buf) {
+        // No data to read
     }
 
-    public static SelfDamagePacket decode(FriendlyByteBuf buf) {
-        return new SelfDamagePacket();
+    @Override
+    public void toBytes(ByteBuf buf) {
+        // No data to write
     }
 
-    public static void handle(SelfDamagePacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player == null) {
-                return;
-            }
+    public static class Handler implements IMessageHandler<SelfDamagePacket, IMessage> {
 
-            ItemStack mainHandItem = player.getMainHandItem();
-            float damageAmount = 1.0f;
-            if (!mainHandItem.isEmpty() && mainHandItem.getAttributeModifiers(EquipmentSlot.MAINHAND).containsKey(Attributes.ATTACK_DAMAGE)) {
+        @Override
+        public IMessage onMessage(SelfDamagePacket message, MessageContext ctx) {
+            // Get the player from the context
+            EntityPlayerMP player = ctx.getServerHandler().player;
 
-                damageAmount = (float) mainHandItem.getAttributeModifiers(EquipmentSlot.MAINHAND)
-                        .get(Attributes.ATTACK_DAMAGE).stream()
-                        .filter(attr -> attr.getOperation() == AttributeModifier.Operation.ADDITION)
-                        .mapToDouble(AttributeModifier::getAmount)
-                        .sum();
-                damageAmount = Math.max(1.0f, damageAmount + 1.0f);
+            // Schedule the task on the main server thread
+            player.getServerWorld().addScheduledTask(() -> {
+                if (player == null) return;
 
-                LOGGER.debug("Calculated self-damage for {}: {}", player.getName().getString(), damageAmount);
-            } else {
-                LOGGER.debug("No weapon or attack damage attribute found for {}. Using default damage.", player.getName().getString());
-                damageAmount = 1.0f;
-            }
+                ItemStack mainHandItem = player.getHeldItemMainhand();
+                float damageAmount = 1.0f;
 
-            if (damageAmount > 0) {
-                DamageSource source = player.level().damageSources().playerAttack(player);
-                player.hurt(source, damageAmount);
-            }
-        });
-        ctx.get().setPacketHandled(true);
+                if (!mainHandItem.isEmpty()) {
+                    // In 1.12.2, getAttributeModifiers returns a Multimap
+                    Multimap<String, AttributeModifier> modifiers = mainHandItem.getAttributeModifiers(EntityEquipmentSlot.MAINHAND);
+                    String attackDamageKey = SharedMonsterAttributes.ATTACK_DAMAGE.getName();
+
+                    if (modifiers.containsKey(attackDamageKey)) {
+                        Collection<AttributeModifier> attackModifiers = modifiers.get(attackDamageKey);
+
+                        double sum = 0;
+                        for (AttributeModifier mod : attackModifiers) {
+                            // Operation 0 is ADDITION
+                            if (mod.getOperation() == 0) {
+                                sum += mod.getAmount();
+                            }
+                        }
+
+                        // Base damage logic (similar to original code)
+                        damageAmount = (float) Math.max(1.0f, sum + 1.0f);
+                        LOGGER.debug("Calculated self-damage for {}: {}", player.getName(), damageAmount);
+                    } else {
+                        LOGGER.debug("No attack damage attribute found for {}. Using default damage.", player.getName());
+                        damageAmount = 1.0f;
+                    }
+                } else {
+                    LOGGER.debug("No weapon found for {}. Using default damage.", player.getName());
+                    damageAmount = 1.0f;
+                }
+
+                if (damageAmount > 0) {
+                    // causePlayerDamage creates a source of type "player"
+                    player.attackEntityFrom(DamageSource.causePlayerDamage(player), damageAmount);
+                }
+            });
+
+            return null; // No response packet needed
+        }
     }
 }
