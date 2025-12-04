@@ -92,7 +92,7 @@ public class MineZero {
 
             ARTIFACT_FLUTE = new ArtifactFluteItem();
             ARTIFACT_FLUTE.setRegistryName("artifact_flute");
-            ARTIFACT_FLUTE.setTranslationKey(MODID + ".artifact_flute");
+            ARTIFACT_FLUTE.setUnlocalizedName(MODID + ".artifact_flute");
             ARTIFACT_FLUTE.setCreativeTab(CreativeTabs.TOOLS);
             event.getRegistry().register(ARTIFACT_FLUTE);
         }
