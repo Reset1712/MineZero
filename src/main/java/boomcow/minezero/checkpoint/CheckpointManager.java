@@ -1,5 +1,6 @@
 package boomcow.minezero.checkpoint;
 
+import boomcow.minezero.MineZero;
 import boomcow.minezero.util.LightningScheduler;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementProgress;
@@ -138,10 +139,8 @@ public class CheckpointManager {
             }
             pdata.advancements = advTag;
 
-            data.savePlayerData(player.getUniqueID(), pdata);
+        data.savePlayerData(player.getUniqueID(), pdata);
         }
-
-        data.setCheckpointDayTime(level.getWorldTime());
 
         // Save Entities
         List<NBTTagCompound> entityList = new ArrayList<>();
@@ -385,10 +384,21 @@ public class CheckpointManager {
                     player.experience = pdata.experienceProgress;
 
                     // FIX: Restore Fire ticks using reflection
+                    player.extinguish();
+
+                    // 2. Now apply the specific tick value from the checkpoint (usually 0)
+                    int fireTicksToRestore = pdata.fireTicks; // Or whatever your variable is named
+
                     try {
-                        ObfuscationReflectionHelper.setPrivateValue(Entity.class, player, pdata.fireTicks, FIELD_ENTITY_FIRE, "fire");
+                        // This sets the server-side logic counter
+                        ObfuscationReflectionHelper.setPrivateValue(Entity.class, player, fireTicksToRestore, "field_70151_c", "fire");
                     } catch (Exception e) {
-                        logger.warn("Failed to set fire ticks", e);
+                        MineZero.LOGGER.error("Failed to restore fire ticks", e);
+                    }
+
+                    // 3. Extra Safety: If the ticks are 0, ensure the 'burning' flag is false
+                    if (fireTicksToRestore <= 0) {
+                        player.setFire(0);
                     }
 
                     if (pdata.gameMode != null) {
@@ -463,16 +473,19 @@ public class CheckpointManager {
             for (WorldServer serverLevel : DimensionManager.getWorlds()) {
                 List<Entity> entitiesToRemove = new ArrayList<>();
                 for (Entity entity : serverLevel.getLoadedEntityList()) {
+                    // ISSUE: You are skipping players (good), but you might be missing some checks
                     if (!(entity instanceof EntityPlayer) && !entity.isDead) {
                         entitiesToRemove.add(entity);
                     }
                 }
                 for (Entity entity : entitiesToRemove) {
-                    entity.setDead();
+                    entity.setDead(); // Marks for removal
+                    serverLevel.removeEntity(entity); // Force removal immediately
                 }
             }
 
             // Restore Saved Entities
+// Restore Saved Entities
             List<NBTTagCompound> entities = data.getEntityData();
             List<Integer> entityDimensions = data.getEntityDimensions();
             Map<UUID, UUID> entityAggroTargets = data.getEntityAggroTargets();
@@ -484,6 +497,16 @@ public class CheckpointManager {
 
                 WorldServer targetLevel = server.getWorld(entityDim);
                 if (targetLevel != null) {
+                    // Check if entity already exists to prevent UUID spam
+                    UUID uuid = eNBT.getUniqueId("UUID");
+                    Entity existing = targetLevel.getEntityFromUuid(uuid);
+
+                    if (existing != null) {
+                        // OPTION A: Kill existing so we can replace it
+                        targetLevel.removeEntityDangerously(existing); // Force remove immediately
+                        existing.setDead();
+                    }
+
                     Entity entity = EntityList.createEntityFromNBT(eNBT, targetLevel);
                     if (entity != null) {
                         targetLevel.spawnEntity(entity);

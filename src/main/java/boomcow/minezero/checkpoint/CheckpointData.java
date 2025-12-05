@@ -1,9 +1,7 @@
 package boomcow.minezero.checkpoint;
 
-import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
@@ -19,36 +17,16 @@ public class CheckpointData extends WorldSavedData {
     public static final String DATA_NAME = "global_checkpoint";
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private static final String KEY_CHECKPOINT_DIMENSION = "checkpointDimension";
     private static final String KEY_PLAYERS_DATA = "playersData";
-    private static final String KEY_FIRE_TICKS = "fireTicks";
     private static final String KEY_ANCHOR_PLAYER_UUID = "anchorPlayerUUID";
-    private static final String KEY_CHECKPOINT_POS_X = "checkpointPosX";
-    private static final String KEY_CHECKPOINT_POS_Y = "checkpointPosY";
-    private static final String KEY_CHECKPOINT_POS_Z = "checkpointPosZ";
-    private static final String KEY_CHECKPOINT_HEALTH = "checkpointHealth";
-    private static final String KEY_CHECKPOINT_HUNGER = "checkpointHunger";
-    private static final String KEY_CHECKPOINT_XP = "checkpointXP";
-    private static final String KEY_CHECKPOINT_DAY_TIME = "checkpointDayTime";
     private static final String KEY_ENTITY_DATA = "entityData";
     private static final String KEY_ENTITY_DIMENSIONS = "entityDimensions";
     private static final String KEY_ENTITY_AGGRO_TARGETS = "entityAggroTargets";
     private static final String KEY_GROUND_ITEMS = "groundItems";
-    private static final String KEY_CHECKPOINT_INVENTORY = "checkpointInventory";
     private static final String KEY_WORLD_DATA = "worldCheckpointData";
 
-    // In 1.12, dimensions are Integers. Default to 0 (Overworld)
-    private int checkpointDimension = 0;
-
     private Map<UUID, NBTTagCompound> playersData = new HashMap<>();
-    private int fireTicks;
     private UUID anchorPlayerUUID;
-    private BlockPos checkpointPos;
-    private List<ItemStack> checkpointInventory = new ArrayList<>();
-    private float checkpointHealth;
-    private int checkpointHunger;
-    private int checkpointXP;
-    private long checkpointDayTime;
 
     private List<NBTTagCompound> entityData = new ArrayList<>();
     private List<Integer> entityDimensions = new ArrayList<>();
@@ -67,15 +45,6 @@ public class CheckpointData extends WorldSavedData {
         super(DATA_NAME);
     }
 
-    public void setCheckpointDimension(int dimension) {
-        this.checkpointDimension = dimension;
-        this.markDirty();
-    }
-
-    public int getCheckpointDimension() {
-        return checkpointDimension;
-    }
-
     public void savePlayerData(UUID uuid, PlayerData pdata) {
         playersData.put(uuid, pdata.toNBT());
         markDirty();
@@ -86,15 +55,6 @@ public class CheckpointData extends WorldSavedData {
             return PlayerData.fromNBT(playersData.get(uuid));
         }
         return null;
-    }
-
-    public void setFireTicks(int fireTicks) {
-        this.fireTicks = fireTicks;
-        this.markDirty();
-    }
-
-    public int getFireTicks() {
-        return fireTicks;
     }
 
     public void setAnchorPlayerUUID(UUID anchorPlayerUUID) {
@@ -122,10 +82,6 @@ public class CheckpointData extends WorldSavedData {
 
     @Override
     public void readFromNBT(NBTTagCompound nbt) {
-        if (nbt.hasKey(KEY_CHECKPOINT_DIMENSION)) {
-            // Read as integer for 1.12
-            this.checkpointDimension = nbt.getInteger(KEY_CHECKPOINT_DIMENSION);
-        }
 
         if (nbt.hasKey(KEY_PLAYERS_DATA, Constants.NBT.TAG_COMPOUND)) {
             NBTTagCompound playersTag = nbt.getCompoundTag(KEY_PLAYERS_DATA);
@@ -139,34 +95,11 @@ public class CheckpointData extends WorldSavedData {
             }
         }
 
-        this.fireTicks = nbt.getInteger(KEY_FIRE_TICKS);
-
         if (nbt.hasKey(KEY_ANCHOR_PLAYER_UUID)) {
             try {
                 this.anchorPlayerUUID = UUID.fromString(nbt.getString(KEY_ANCHOR_PLAYER_UUID));
             } catch (Exception e) {
                 LOGGER.warn("Failed to parse Anchor Player UUID");
-            }
-        }
-
-        if (nbt.hasKey(KEY_CHECKPOINT_POS_X)) {
-            this.checkpointPos = new BlockPos(
-                    nbt.getInteger(KEY_CHECKPOINT_POS_X),
-                    nbt.getInteger(KEY_CHECKPOINT_POS_Y),
-                    nbt.getInteger(KEY_CHECKPOINT_POS_Z)
-            );
-        }
-
-        this.checkpointHealth = nbt.getFloat(KEY_CHECKPOINT_HEALTH);
-        this.checkpointHunger = nbt.getInteger(KEY_CHECKPOINT_HUNGER);
-        this.checkpointXP = nbt.getInteger(KEY_CHECKPOINT_XP);
-        this.checkpointDayTime = nbt.getLong(KEY_CHECKPOINT_DAY_TIME);
-
-        if (nbt.hasKey(KEY_CHECKPOINT_INVENTORY, Constants.NBT.TAG_LIST)) {
-            NBTTagList invListTag = nbt.getTagList(KEY_CHECKPOINT_INVENTORY, Constants.NBT.TAG_COMPOUND);
-            this.checkpointInventory.clear();
-            for (int i = 0; i < invListTag.tagCount(); i++) {
-                this.checkpointInventory.add(new ItemStack(invListTag.getCompoundTagAt(i)));
             }
         }
 
@@ -228,7 +161,6 @@ public class CheckpointData extends WorldSavedData {
 
     @Override
     public NBTTagCompound writeToNBT(NBTTagCompound nbt) {
-        nbt.setInteger(KEY_CHECKPOINT_DIMENSION, checkpointDimension);
 
         NBTTagCompound playersNbt = new NBTTagCompound();
         for (Map.Entry<UUID, NBTTagCompound> entry : playersData.entrySet()) {
@@ -236,29 +168,9 @@ public class CheckpointData extends WorldSavedData {
         }
         nbt.setTag(KEY_PLAYERS_DATA, playersNbt);
 
-        nbt.setInteger(KEY_FIRE_TICKS, fireTicks);
-
         if (anchorPlayerUUID != null) {
             nbt.setString(KEY_ANCHOR_PLAYER_UUID, anchorPlayerUUID.toString());
         }
-
-        if (checkpointPos != null) {
-            nbt.setInteger(KEY_CHECKPOINT_POS_X, checkpointPos.getX());
-            nbt.setInteger(KEY_CHECKPOINT_POS_Y, checkpointPos.getY());
-            nbt.setInteger(KEY_CHECKPOINT_POS_Z, checkpointPos.getZ());
-        }
-        nbt.setFloat(KEY_CHECKPOINT_HEALTH, checkpointHealth);
-        nbt.setInteger(KEY_CHECKPOINT_HUNGER, checkpointHunger);
-        nbt.setInteger(KEY_CHECKPOINT_XP, checkpointXP);
-        nbt.setLong(KEY_CHECKPOINT_DAY_TIME, checkpointDayTime);
-
-        NBTTagList invListTag = new NBTTagList();
-        for (ItemStack stack : checkpointInventory) {
-            if (!stack.isEmpty()) {
-                invListTag.appendTag(stack.writeToNBT(new NBTTagCompound()));
-            }
-        }
-        nbt.setTag(KEY_CHECKPOINT_INVENTORY, invListTag);
 
         NBTTagList entityListNbt = new NBTTagList();
         for (NBTTagCompound entityNBT : entityData) {
@@ -318,23 +230,16 @@ public class CheckpointData extends WorldSavedData {
 
         MapStorage storage = overworld.getMapStorage();
         CheckpointData instance = (CheckpointData) storage.getOrLoadData(CheckpointData.class, DATA_NAME);
-        LOGGER.info("CheckpointData instance: {}", instance);
+
+        if (instance != null) {
+             LOGGER.info("CheckpointData instance: {}", instance);
+        }
 
         if (instance == null) {
             instance = new CheckpointData(DATA_NAME);
             storage.setData(DATA_NAME, instance);
         }
         return instance;
-    }
-
-    public void setCheckpointPos(BlockPos pos) {
-        this.checkpointPos = pos;
-        this.markDirty();
-    }
-
-    public void setCheckpointHealth(float health) {
-        this.checkpointHealth = health;
-        this.markDirty();
     }
 
     public void setEntityAggroTargets(Map<UUID, UUID> aggroTargets) {
@@ -346,26 +251,6 @@ public class CheckpointData extends WorldSavedData {
         return entityAggroTargets;
     }
 
-    public void setCheckpointInventory(List<ItemStack> inv) {
-        this.checkpointInventory = inv;
-        this.markDirty();
-    }
-
-    public void setCheckpointHunger(int hunger) {
-        this.checkpointHunger = hunger;
-        this.markDirty();
-    }
-
-    public void setCheckpointXP(int xp) {
-        this.checkpointXP = xp;
-        this.markDirty();
-    }
-
-    public void setCheckpointDayTime(long dayTime) {
-        this.checkpointDayTime = dayTime;
-        this.markDirty();
-    }
-
     public void setEntityData(List<NBTTagCompound> entities) {
         this.entityData = entities;
         this.markDirty();
@@ -374,30 +259,6 @@ public class CheckpointData extends WorldSavedData {
     public void setGroundItems(List<NBTTagCompound> groundItems) {
         this.groundItems = groundItems;
         this.markDirty();
-    }
-
-    public BlockPos getCheckpointPos() {
-        return checkpointPos;
-    }
-
-    public float getCheckpointHealth() {
-        return checkpointHealth;
-    }
-
-    public int getCheckpointHunger() {
-        return checkpointHunger;
-    }
-
-    public int getCheckpointXP() {
-        return checkpointXP;
-    }
-
-    public long getCheckpointDayTime() {
-        return checkpointDayTime;
-    }
-
-    public List<ItemStack> getCheckpointInventory() {
-        return checkpointInventory;
     }
 
     public List<NBTTagCompound> getEntityData() {
@@ -423,17 +284,9 @@ public class CheckpointData extends WorldSavedData {
         StringBuilder sb = new StringBuilder();
         sb.append("CheckpointData Instance:\n");
         sb.append("  AnchorPlayerUUID: ").append(anchorPlayerUUID).append("\n");
-        sb.append("  CheckpointPos: ").append(checkpointPos).append("\n");
-        sb.append("  CheckpointDimension: ").append(checkpointDimension).append("\n");
-        sb.append("  CheckpointHealth: ").append(checkpointHealth).append("\n");
-        sb.append("  CheckpointHunger: ").append(checkpointHunger).append("\n");
-        sb.append("  CheckpointXP: ").append(checkpointXP).append("\n");
-        sb.append("  CheckpointDayTime: ").append(checkpointDayTime).append("\n");
-        sb.append("  FireTicks: ").append(fireTicks).append("\n");
         sb.append("  EntityData Count: ").append(entityData.size()).append("\n");
         sb.append("  EntityDimensions Count: ").append(entityDimensions.size()).append("\n");
         sb.append("  GroundItems Count: ").append(groundItems.size()).append("\n");
-        sb.append("  CheckpointInventory Count: ").append(checkpointInventory.size()).append("\n");
         sb.append("  PlayersData Count: ").append(playersData.size()).append("\n");
         sb.append("  WorldData Present: ").append(worldData != null).append("\n");
         return sb.toString();
