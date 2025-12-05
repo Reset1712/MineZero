@@ -56,12 +56,15 @@
     - Time should revert to Day.
     - Rain should stop immediately.
 
-### 6. Dimensional Travel
+### 6. Dimensional Travel & Persistence
 - [ ] **Action**: Run `/setCheckpoint` in the Overworld.
 - [ ] **Action**: Enter a Nether Portal.
-- [ ] **Action**: Trigger RBD while in the Nether.
+- [ ] **Action**: Disconnect and **Close Minecraft completely**.
+- [ ] **Action**: Relaunch and Join the world (you should spawn in the Nether).
+- [ ] **Action**: Trigger RBD (`/triggerRBD`).
 - [ ] **Result**:
     - You should load back into the Overworld at the checkpoint.
+    - The checkpoint data should not be lost.
 
 ## Debug Commands
 - `/triggerRBD`: Manually triggers the restoration without needing to die. Useful for quick iteration.

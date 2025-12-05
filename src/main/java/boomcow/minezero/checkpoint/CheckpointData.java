@@ -8,6 +8,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 import net.minecraft.world.storage.WorldSavedData;
+import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.util.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -302,10 +303,22 @@ public class CheckpointData extends WorldSavedData {
      * In 1.12.2, we generally use the Overworld (Dim 0) storage for "Global" mod data.
      */
     public static CheckpointData get(World world) {
-        // Ensure we are getting the MapStorage from the overworld (dimension 0) to keep it global
-        MapStorage storage = world.getMapStorage();
+        if (world.isRemote) {
+            throw new RuntimeException("Attempted to access CheckpointData from client-side world.");
+        }
 
+        // ALWAYS use the Overworld (Dimension 0) MapStorage to ensure data is global across dimensions.
+        // If we use 'world.getMapStorage()' on a Nether world, it saves to DIM-1/data, which is not loaded when in Overworld.
+        WorldServer overworld = DimensionManager.getWorld(0);
+        if (overworld == null) {
+            // Fallback (should unlikely happen on a running server)
+            LOGGER.warn("Overworld not found via DimensionManager! Using provided world storage.");
+            overworld = (WorldServer) world;
+        }
+
+        MapStorage storage = overworld.getMapStorage();
         CheckpointData instance = (CheckpointData) storage.getOrLoadData(CheckpointData.class, DATA_NAME);
+        LOGGER.info("CheckpointData instance: {}", instance);
 
         if (instance == null) {
             instance = new CheckpointData(DATA_NAME);

@@ -83,7 +83,7 @@ public class CheckpointManager {
 
             // FIX: Access private 'fire' field via Reflection
             try {
-                pdata.fireTicks = ObfuscationReflectionHelper.getPrivateValue(Entity.class, player, FIELD_ENTITY_FIRE);
+                pdata.fireTicks = ObfuscationReflectionHelper.getPrivateValue(Entity.class, player, FIELD_ENTITY_FIRE, "fire");
             } catch (Exception e) {
                 pdata.fireTicks = 0;
                 logger.warn("Failed to reflectively get fire ticks", e);
@@ -386,7 +386,7 @@ public class CheckpointManager {
 
                     // FIX: Restore Fire ticks using reflection
                     try {
-                        ObfuscationReflectionHelper.setPrivateValue(Entity.class, player, pdata.fireTicks, FIELD_ENTITY_FIRE);
+                        ObfuscationReflectionHelper.setPrivateValue(Entity.class, player, pdata.fireTicks, FIELD_ENTITY_FIRE, "fire");
                     } catch (Exception e) {
                         logger.warn("Failed to set fire ticks", e);
                     }
