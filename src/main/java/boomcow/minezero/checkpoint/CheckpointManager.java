@@ -24,6 +24,7 @@ import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.SPacketChangeGameState;
+import net.minecraft.network.play.server.SPacketSetExperience;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
@@ -368,12 +369,37 @@ public class CheckpointManager {
             }
 
             // Restore Players
-            for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
+            // Use a copy of the list to avoid ConcurrentModificationException and allow updating player references
+            List<EntityPlayerMP> playerList = new ArrayList<>(server.getPlayerList().getPlayers());
+            for (EntityPlayerMP player : playerList) {
                 PlayerData pdata = data.getPlayerData(player.getUniqueID());
                 if (pdata != null) {
                     if (player.dimension != pdata.dimension) {
-                        server.getPlayerList().transferPlayerToDimension(player, pdata.dimension, new net.minecraft.world.Teleporter(server.getWorld(pdata.dimension)));
+                        // FIX: Ensure player is not dead before transfer to prevent dead entity cloning
+                        if (player.getHealth() <= 0) {
+                            player.setHealth(pdata.health > 0 ? pdata.health : 20.0f);
+                        }
+
+                        WorldServer targetWorld = server.getWorld(pdata.dimension);
+                        
+                        // Use PreciseTeleporter to place player exactly where they should be
+                        server.getPlayerList().transferPlayerToDimension(player, pdata.dimension, 
+                            new PreciseTeleporter(targetWorld, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch));
+                        
+                        // Update player reference as transfer creates a new entity
+                        EntityPlayerMP newPlayer = server.getPlayerList().getPlayerByUUID(player.getUniqueID());
+                        if (newPlayer != null) {
+                            player = newPlayer;
+                        } else {
+                            // If player lost (should unlikely happen), abort restoring this player
+                            continue;
+                        }
+
+                        // Explicitly set position again for safety (though PreciseTeleporter should handle it)
                         player.connection.setPlayerLocation(pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                        
+                        // FIX: Force sync world/weather to client after dimension change
+                        server.getPlayerList().updateTimeAndWeatherForPlayer(player, targetWorld);
                     } else {
                         player.connection.setPlayerLocation(pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
                     }
@@ -382,6 +408,9 @@ public class CheckpointManager {
                     player.getFoodStats().setFoodLevel(pdata.hunger);
                     player.experienceLevel = pdata.experienceLevel;
                     player.experience = pdata.experienceProgress;
+                    
+                    // FIX: Sync experience packet
+                    player.connection.sendPacket(new SPacketSetExperience(player.experience, player.experienceTotal, player.experienceLevel));
 
                     // FIX: Restore Fire ticks using reflection
                     player.extinguish();
@@ -417,9 +446,6 @@ public class CheckpointManager {
                                 pdata.spawnForced,
                                 pdata.spawnDimension
                         );
-
-                        // The reflection block for 'FIELD_PLAYER_SPAWN_DIMENSION' is no longer needed
-                        // because the 3rd argument above handles it automatically.
                     }
 
                     player.motionX = pdata.motionX;
@@ -466,6 +492,9 @@ public class CheckpointManager {
                             player.inventory.setInventorySlotContents(i, pdata.inventory.get(i));
                         }
                     }
+                    
+                    // FIX: Force inventory sync to client
+                    player.sendContainerToPlayer(player.inventoryContainer);
                 }
             }
 
@@ -579,6 +608,71 @@ public class CheckpointManager {
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
             e.printStackTrace();
+        }
+    }
+
+    private static class PreciseTeleporter extends net.minecraft.world.Teleporter {
+        private final double x;
+        private final double y;
+        private final double z;
+        private final float yaw;
+        private final float pitch;
+
+        public PreciseTeleporter(WorldServer worldIn, double x, double y, double z, float yaw, float pitch) {
+            super(worldIn);
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.yaw = yaw;
+            this.pitch = pitch;
+        }
+
+        @Override
+        public void placeInPortal(Entity entityIn, float rotationYaw) {
+            // Set position immediately so the entity is in the correct spot in the new world
+            entityIn.setLocationAndAngles(x, y, z, yaw, pitch);
+            entityIn.motionX = 0;
+            entityIn.motionY = 0;
+            entityIn.motionZ = 0;
+        }
+
+        @Override
+        public boolean placeInExistingPortal(Entity entityIn, float rotationYaw) {
+            return true;
+        }
+
+        @Override
+        public boolean makePortal(Entity entityIn) {
+            return true;
+        }
+
+        @Override
+        public void removeStalePortalLocations(long worldTime) {
+        }
+    }
+
+    // Keep NoOpTeleporter if used elsewhere, but for now PreciseTeleporter replaces it in this context.
+    private static class NoOpTeleporter extends net.minecraft.world.Teleporter {
+        public NoOpTeleporter(WorldServer worldIn) {
+            super(worldIn);
+        }
+
+        @Override
+        public void placeInPortal(Entity entityIn, float rotationYaw) {
+        }
+
+        @Override
+        public boolean placeInExistingPortal(Entity entityIn, float rotationYaw) {
+            return true;
+        }
+
+        @Override
+        public boolean makePortal(Entity entityIn) {
+            return true;
+        }
+
+        @Override
+        public void removeStalePortalLocations(long worldTime) {
         }
     }
 }
