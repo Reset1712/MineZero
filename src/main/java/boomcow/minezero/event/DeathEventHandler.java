@@ -12,18 +12,16 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@EventBusSubscriber(modid = MineZero.MODID)
 public class DeathEventHandler {
 
     private static final Logger LOGGER = LogManager.getLogger();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPlayerDeath(LivingDeathEvent event) {
+    public void onPlayerDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -60,7 +58,7 @@ public class DeathEventHandler {
         }
     }
 
-    private static void playClassicChime(ServerPlayer player) {
+    private void playClassicChime(ServerPlayer player) {
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
                 ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "death_chime"),
                 SoundSource.PLAYERS);
@@ -68,7 +66,7 @@ public class DeathEventHandler {
         player.playNotifySound(ModSoundEvents.DEATH_CHIME.get(), SoundSource.PLAYERS, 0.8F, 1.0F);
     }
 
-    private static void playAlternateChime(ServerPlayer player) {
+    private void playAlternateChime(ServerPlayer player) {
         ClientboundStopSoundPacket stopSoundPacket = new ClientboundStopSoundPacket(
                 ResourceLocation.fromNamespaceAndPath(MineZero.MODID, "alt_death_chime"),
                 SoundSource.PLAYERS);
