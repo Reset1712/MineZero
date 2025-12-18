@@ -81,7 +81,7 @@ public class MineZero {
         NeoForge.EVENT_BUS.register(new DeathEventHandler());
 
         NeoForge.EVENT_BUS.register(CheckpointTicker.class);
-        NeoForge.EVENT_BUS.register(ExplosionEventHandler.class);
+        // REMOVED ExplosionEventHandler
         NeoForge.EVENT_BUS.register(GlobalTickHandler.class);
         NeoForge.EVENT_BUS.register(LightningStrikeListener.class);
         NeoForge.EVENT_BUS.register(NonPlayerChangeHandler.class);
@@ -234,12 +234,7 @@ public class MineZero {
 
     private void clientSetup(final FMLClientSetupEvent event) {
         LOGGER.info("HELLO FROM CLIENT SETUP (Mod Event Bus)");
-
         NeoForge.EVENT_BUS.register(ClientForgeEvents.class);
-
-        event.enqueueWork(() -> {
-            LOGGER.info("Performing client-side enqueued work (from clientSetup).");
-        });
     }
     private void registerKeyMappings(final RegisterKeyMappingsEvent event) {
         LOGGER.info("Registering MineZero Key Mappings (Mod Event Bus)");

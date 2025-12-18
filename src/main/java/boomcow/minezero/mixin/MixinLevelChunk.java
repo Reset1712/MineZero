@@ -10,6 +10,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,6 +27,8 @@ public abstract class MixinLevelChunk {
     @Shadow
     public abstract Level getLevel();
 
+    @Shadow public abstract ChunkStatus getPersistedStatus();
+
     @Inject(method = "setBlockState(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Z)Lnet/minecraft/world/level/block/state/BlockState;", at = @At("HEAD"))
     private void onSetBlockState(BlockPos pos, BlockState newState, boolean isMoving, CallbackInfoReturnable<BlockState> cir) {
         Level level = this.getLevel();
@@ -33,6 +36,15 @@ public abstract class MixinLevelChunk {
         if (level.isClientSide || !(level instanceof ServerLevel serverLevel)) {
             return;
         }
+
+        // --- NEW FIX: IGNORE WORLD GEN ---
+        // If the chunk is not fully generated yet (e.g. creating new terrain), ignore these changes.
+        // This prevents the "Void World" bug where the mod deletes newly generated chunks upon reset.
+        ChunkStatus status = this.getPersistedStatus();
+        if (status != null && !status.isOrAfter(ChunkStatus.FULL)) {
+            return;
+        }
+        // ---------------------------------
 
         if (CheckpointManager.isRestoring) {
             return;
