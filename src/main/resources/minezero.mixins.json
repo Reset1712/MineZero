@@ -7,7 +7,7 @@
   "mixins": [
     "MixinLevelChunk",
     "MixinExplosion",
-    "MixinServerGamePacketListenerImpl"
+    "MixinServerCommonPacketListenerImpl"
   ],
   "injectors": {
     "defaultRequire": 1
