@@ -16,10 +16,11 @@ import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
-@Mod.EventBusSubscriber(modid = MineZero.MODID)
+@EventBusSubscriber(modid = MineZero.MODID)
 public class EntityTracker {
 
     @SubscribeEvent
@@ -36,7 +37,7 @@ public class EntityTracker {
 
         boolean shouldTrack = entity instanceof Mob || 
                               entity instanceof AbstractMinecart || 
-                              entity instanceof Boat ||
+                              entity instanceof Boat || 
                               entity instanceof ArmorStand || 
                               entity instanceof HangingEntity;
 
