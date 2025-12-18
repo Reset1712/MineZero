@@ -6,7 +6,8 @@
   "refmap": "minezero.refmap.json",
   "mixins": [
     "MixinLevelChunk",
-    "MixinExplosion"
+    "MixinExplosion",
+    "MixinServerGamePacketListenerImpl"
   ],
   "injectors": {
     "defaultRequire": 1

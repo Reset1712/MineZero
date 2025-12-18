@@ -1,0 +1,35 @@
+{
+  "item.minezero.artifact_flute": "Артефактная флейта",
+
+  "gamerule.autoCheckpointEnabled": "Автоматические контрольные точки",
+  "gamerule.autoCheckpointEnabled.description": "Включить или выключить автоматическое создание контрольных точек.",
+
+  "gamerule.checkpointFixedInterval": "Фиксированный интервал контрольных точек",
+  "gamerule.checkpointFixedInterval.description": "Количество секунд между каждым сохранением контрольной точки.",
+
+  "gamerule.useRandomCheckpointInterval": "Использовать случайный интервал",
+  "gamerule.useRandomCheckpointInterval.description": "Случайно выбирать интервал для контрольной точки между [Нижней границей] и [Верхней границей] секунд.",
+
+  "gamerule.randomCheckpointLowerBound": "Нижняя граница случайной контрольной точки",
+  "gamerule.randomCheckpointLowerBound.description": "Нижняя граница (в секундах) для случайного интервала контрольной точки.",
+
+  "gamerule.randomCheckpointUpperBound": "Верхняя граница случайной контрольной точки",
+  "gamerule.randomCheckpointUpperBound.description": "Верхняя граница (в секундах) для случайного интервала контрольной точки.",
+
+  "gamerule.fluteCooldownEnabled": "Перезарядка флейты включена",
+  "gamerule.fluteCooldownEnabled.description": "Включить или выключить перезарядку для использования Артефактной флейты.",
+
+  "gamerule.fluteCooldownDuration": "Длительность перезарядки флейты",
+  "gamerule.fluteCooldownDuration.description": "Длительность в секундах для перезарядки Артефактной флейты.",
+
+  "gamerule.artifactFluteEnabled": "Артефактная флейта включена",
+  "gamerule.artifactFluteEnabled.description": "Включить или выключить возможность использования Артефактной флейты.",
+
+  "gamerule.setCheckpointOnWorldCreation": "Создать контрольную точку при создании мира",
+  "gamerule.setCheckpointOnWorldCreation.description": "Автоматически создавать контрольную точку при создании нового мира.",
+
+  "_comment": "Назначение клавиш",
+  "key.categories.minezero": "Клавиши MineZero",
+  "key.minezero.example_action": "Пример действия",
+  "key.minezero.self_damage": "Нанести себе урон оружием"
+}
