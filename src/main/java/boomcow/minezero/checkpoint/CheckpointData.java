@@ -38,19 +38,71 @@ public class CheckpointData extends SavedData {
     private static final String KEY_GROUND_ITEMS = "groundItems";
     private static final String KEY_CHECKPOINT_INVENTORY = "checkpointInventory";
     private static final String KEY_WORLD_DATA = "worldCheckpointData";
+    private static final String KEY_DYNAMIC_ENTITIES = "dynamicEntities";
 
     private ResourceKey<Level> checkpointDimension;
+    private Map<UUID, CompoundTag> playersData = new HashMap<>();
+    private int fireTicks;
+    private UUID anchorPlayerUUID;
+    private BlockPos checkpointPos;
+    private List<ItemStack> checkpointInventory = new ArrayList<>();
+    private float checkpointHealth;
+    private int checkpointHunger;
+    private int checkpointXP;
+    private long checkpointDayTime;
+    
+    private List<CompoundTag> entityData = new ArrayList<>();
+    private List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
+    
+    private Map<UUID, CompoundTag> dynamicEntityData = new HashMap<>();
+    private Map<UUID, String> dynamicEntityDimensions = new HashMap<>();
+    
+    private Map<UUID, UUID> entityAggroTargets = new HashMap<>();
+    private List<CompoundTag> groundItems = new ArrayList<>();
+    private WorldData worldData = new WorldData();
+    private final Set<UUID> savedEntityUUIDs = new HashSet<>();
+
+    public CheckpointData() {
+    }
+
+    public void trackDynamicEntity(UUID uuid, CompoundTag nbt, ResourceKey<Level> dimension) {
+        if (!savedEntityUUIDs.contains(uuid)) {
+            savedEntityUUIDs.add(uuid);
+            dynamicEntityData.put(uuid, nbt);
+            dynamicEntityDimensions.put(uuid, dimension.location().toString());
+            setDirty();
+        }
+    }
+
+    public Map<UUID, CompoundTag> getDynamicEntityData() {
+        return dynamicEntityData;
+    }
+
+    public Map<UUID, String> getDynamicEntityDimensions() {
+        return dynamicEntityDimensions;
+    }
+
+    public void clearAllEntityData() {
+        this.entityData.clear();
+        this.entityDimensions.clear();
+        this.dynamicEntityData.clear();
+        this.dynamicEntityDimensions.clear();
+        this.savedEntityUUIDs.clear();
+        this.setDirty();
+    }
+
+    public boolean isEntitySaved(UUID uuid) {
+        return savedEntityUUIDs.contains(uuid);
+    }
+
     public void setCheckpointDimension(ResourceKey<Level> dimension) {
         this.checkpointDimension = dimension;
         this.setDirty();
     }
 
-
-
     public ResourceKey<Level> getCheckpointDimension() {
         return checkpointDimension;
     }
-    private Map<UUID, CompoundTag> playersData = new HashMap<>();
 
     public void savePlayerData(UUID uuid, CompoundTag playerDataNBT) {
         this.playersData.put(uuid, playerDataNBT);
@@ -64,9 +116,6 @@ public class CheckpointData extends SavedData {
         return null;
     }
 
-
-    private int fireTicks;
-
     public void setFireTicks(int fireTicks) {
         this.fireTicks = fireTicks;
         this.setDirty();
@@ -76,8 +125,6 @@ public class CheckpointData extends SavedData {
         return fireTicks;
     }
 
-    private UUID anchorPlayerUUID;
-
     public void setAnchorPlayerUUID(UUID anchorPlayerUUID) {
         this.anchorPlayerUUID = anchorPlayerUUID;
         this.setDirty();
@@ -85,27 +132,6 @@ public class CheckpointData extends SavedData {
 
     public UUID getAnchorPlayerUUID() {
         return anchorPlayerUUID;
-    }
-
-
-    private BlockPos checkpointPos;
-    private List<ItemStack> checkpointInventory = new ArrayList<>();
-    private float checkpointHealth;
-    private int checkpointHunger;
-    private int checkpointXP;
-
-    private long checkpointDayTime;
-    private List<CompoundTag> entityData = new ArrayList<>();
-    private List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
-    private Map<UUID, UUID> entityAggroTargets = new HashMap<>();
-
-
-
-    private List<CompoundTag> groundItems = new ArrayList<>();
-
-    private WorldData worldData = new WorldData();
-
-    public CheckpointData() {
     }
 
     public WorldData getWorldData() {
@@ -159,12 +185,16 @@ public class CheckpointData extends SavedData {
         data.checkpointXP = nbt.getInt(KEY_CHECKPOINT_XP);
         data.checkpointDayTime = nbt.getLong(KEY_CHECKPOINT_DAY_TIME);
 
-
+        data.savedEntityUUIDs.clear();
         if (nbt.contains(KEY_ENTITY_DATA, Tag.TAG_LIST)) {
             ListTag entityListTag = nbt.getList(KEY_ENTITY_DATA, Tag.TAG_COMPOUND);
             data.entityData.clear();
             for (int i = 0; i < entityListTag.size(); i++) {
-                data.entityData.add(entityListTag.getCompound(i));
+                CompoundTag tag = entityListTag.getCompound(i);
+                data.entityData.add(tag);
+                if (tag.hasUUID("UUID")) {
+                    data.savedEntityUUIDs.add(tag.getUUID("UUID"));
+                }
             }
         }
 
@@ -179,10 +209,20 @@ public class CheckpointData extends SavedData {
                 }
             }
         }
-        if (data.entityData.size() > 0 && data.entityData.size() != data.entityDimensions.size()) {
-            LOGGER.warn("Mismatch in loaded entityData ({}) and entityDimensions ({}). Entity data might be corrupt or incomplete.", data.entityData.size(), data.entityDimensions.size());
-        }
 
+        if (nbt.contains(KEY_DYNAMIC_ENTITIES, Tag.TAG_LIST)) {
+            ListTag dynList = nbt.getList(KEY_DYNAMIC_ENTITIES, Tag.TAG_COMPOUND);
+            for(int i = 0; i < dynList.size(); i++) {
+                CompoundTag entry = dynList.getCompound(i);
+                UUID uuid = entry.getUUID("uuid");
+                CompoundTag entityTag = entry.getCompound("tag");
+                String dim = entry.getString("dim");
+                
+                data.dynamicEntityData.put(uuid, entityTag);
+                data.dynamicEntityDimensions.put(uuid, dim);
+                data.savedEntityUUIDs.add(uuid);
+            }
+        }
 
         if (nbt.contains(KEY_ENTITY_AGGRO_TARGETS, Tag.TAG_COMPOUND)) {
             CompoundTag aggroTag = nbt.getCompound(KEY_ENTITY_AGGRO_TARGETS);
@@ -193,8 +233,6 @@ public class CheckpointData extends SavedData {
                     if (aggroTag.hasUUID(key)) {
                         UUID targetUUID = aggroTag.getUUID(key);
                         data.entityAggroTargets.put(entityUUID, targetUUID);
-                    } else {
-                        LOGGER.warn("Aggro target for {} is not a valid UUID in NBT.", key);
                     }
                 } catch (IllegalArgumentException e) {
                     LOGGER.warn("Failed to parse UUID for aggro target key '{}' from NBT", key, e);
@@ -211,12 +249,10 @@ public class CheckpointData extends SavedData {
         }
         if (nbt.contains(KEY_WORLD_DATA, Tag.TAG_COMPOUND)) {
             data.worldData.loadFromNBT(nbt.getCompound(KEY_WORLD_DATA), lookupProvider);
-        } else {
-            LOGGER.warn("Checkpoint NBT is missing WorldData. A new empty WorldData will be used.");
         }
-        LOGGER.debug("CheckpointData loaded from NBT.");
         return data;
     }
+
     @Override
     public CompoundTag save(CompoundTag nbt, HolderLookup.Provider provider) {
         if (checkpointDimension != null) {
@@ -245,8 +281,6 @@ public class CheckpointData extends SavedData {
         nbt.putInt(KEY_CHECKPOINT_XP, checkpointXP);
         nbt.putLong(KEY_CHECKPOINT_DAY_TIME, checkpointDayTime);
 
-
-
         ListTag entityListNbt = new ListTag();
         for (CompoundTag entityNBT : entityData) {
             entityListNbt.add(entityNBT);
@@ -261,6 +295,16 @@ public class CheckpointData extends SavedData {
         }
         nbt.put(KEY_ENTITY_DIMENSIONS, entityDimListNbt);
 
+        ListTag dynList = new ListTag();
+        for (Map.Entry<UUID, CompoundTag> entry : dynamicEntityData.entrySet()) {
+            CompoundTag wrapper = new CompoundTag();
+            wrapper.putUUID("uuid", entry.getKey());
+            wrapper.put("tag", entry.getValue());
+            wrapper.putString("dim", dynamicEntityDimensions.get(entry.getKey()));
+            dynList.add(wrapper);
+        }
+        nbt.put(KEY_DYNAMIC_ENTITIES, dynList);
+
         CompoundTag aggroTargetsNbt = new CompoundTag();
         for (Map.Entry<UUID, UUID> entry : entityAggroTargets.entrySet()) {
             aggroTargetsNbt.putUUID(entry.getKey().toString(), entry.getValue());
@@ -272,45 +316,24 @@ public class CheckpointData extends SavedData {
             groundItemsListNbt.add(itemNBT);
         }
         nbt.put(KEY_GROUND_ITEMS, groundItemsListNbt);
+        
         CompoundTag worldDataNbt = new CompoundTag();
         if (this.worldData != null) {
             this.worldData.saveToNBT(worldDataNbt);
         }
         nbt.put(KEY_WORLD_DATA, worldDataNbt);
-        LOGGER.debug("CheckpointData saved to NBT.");
         return nbt;
     }
 
     public static CheckpointData get(ServerLevel level) {
-
         SavedData.Factory<CheckpointData> factory = new SavedData.Factory<>(
                 () -> new CheckpointData(),
                 (nbt, provider) -> CheckpointData.load(nbt, provider),
                 null
         );
-
         return level.getServer().overworld().getDataStorage()
                 .computeIfAbsent(factory, CheckpointData.DATA_NAME);
     }
-
-    public String toString(ServerLevel level) {
-        CheckpointData data = get(level);
-        StringBuilder sb = new StringBuilder();
-        sb.append("CheckpointData:\n");
-        sb.append("AnchorPlayerUUID: ").append(data.getAnchorPlayerUUID()).append("\n");
-        sb.append("CheckpointPos: ").append(data.getCheckpointPos()).append("\n");
-        sb.append("CheckpointHealth: ").append(data.getCheckpointHealth()).append("\n");
-        sb.append("CheckpointHunger: ").append(data.getCheckpointHunger()).append("\n");
-        sb.append("CheckpointXP: ").append(data.getCheckpointXP()).append("\n");
-        sb.append("CheckpointDayTime: ").append(data.getCheckpointDayTime()).append("\n");
-        sb.append("FireTicks: ").append(data.getFireTicks()).append("\n");
-        sb.append("EntityData: ").append(data.getEntityData()).append("\n");
-        sb.append("GroundItems: ").append(data.getGroundItems()).append("\n");
-        sb.append("CheckpointInventory: ").append(data.getCheckpointInventory()).append("\n");
-        sb.append("PlayersData: ").append(data.playersData).append("\n");
-        return sb.toString();
-    }
-
 
     public void setCheckpointPos(BlockPos pos) {
         this.checkpointPos = pos;
@@ -330,7 +353,6 @@ public class CheckpointData extends SavedData {
     public Map<UUID, UUID> getEntityAggroTargets() {
         return entityAggroTargets;
     }
-
 
     public void setCheckpointInventory(List<ItemStack> inv) {
         this.checkpointInventory = inv;
@@ -395,33 +417,16 @@ public class CheckpointData extends SavedData {
     public void setEntityDataWithDimensions(List<CompoundTag> entities, List<ResourceKey<Level>> dimensions) {
         this.entityData = entities;
         this.entityDimensions = dimensions;
+        this.savedEntityUUIDs.clear();
+        for (CompoundTag tag : entities) {
+            if (tag.hasUUID("UUID")) {
+                this.savedEntityUUIDs.add(tag.getUUID("UUID"));
+            }
+        }
         this.setDirty();
     }
 
     public List<CompoundTag> getGroundItems() {
         return groundItems;
     }
-
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("CheckpointData Instance:\n");
-        sb.append("  AnchorPlayerUUID: ").append(anchorPlayerUUID).append("\n");
-        sb.append("  CheckpointPos: ").append(checkpointPos).append("\n");
-        sb.append("  CheckpointDimension: ").append(checkpointDimension != null ? checkpointDimension.location() : "null").append("\n");
-        sb.append("  CheckpointHealth: ").append(checkpointHealth).append("\n");
-        sb.append("  CheckpointHunger: ").append(checkpointHunger).append("\n");
-        sb.append("  CheckpointXP: ").append(checkpointXP).append("\n");
-        sb.append("  CheckpointDayTime: ").append(checkpointDayTime).append("\n");
-        sb.append("  FireTicks: ").append(fireTicks).append("\n");
-        sb.append("  EntityData Count: ").append(entityData.size()).append("\n");
-        sb.append("  EntityDimensions Count: ").append(entityDimensions.size()).append("\n");
-        sb.append("  GroundItems Count: ").append(groundItems.size()).append("\n");
-        sb.append("  CheckpointInventory Count: ").append(checkpointInventory.size()).append("\n");
-        sb.append("  PlayersData Count: ").append(playersData.size()).append("\n");
-        sb.append("  WorldData Present: ").append(worldData != null).append("\n");
-        return sb.toString();
-    }
-
-
 }

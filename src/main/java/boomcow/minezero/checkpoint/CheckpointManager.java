@@ -5,12 +5,15 @@ import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,7 +25,7 @@ import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.item.PrimedTnt;
-import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.projectile.EyeOfEnder;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -34,8 +37,12 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EndPortalFrameBlock;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.phys.Vec3;
@@ -44,157 +51,152 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.function.Function;
 
 public class CheckpointManager {
 
+    private static final Logger LOGGER = LogManager.getLogger();
+    public static boolean isRestoring = false;
+    public static boolean wasRestoredThisTick = false;
 
     public static void setCheckpoint(ServerPlayer anchorPlayer) {
-        Logger logger = LogManager.getLogger();
-        logger.info("Setting checkpoint...");
+        LOGGER.info("Setting checkpoint...");
         long startTime = System.nanoTime();
         ServerLevel level = anchorPlayer.serverLevel();
         CheckpointData data = CheckpointData.get(level);
-        HolderLookup.Provider lookupProvider = level.registryAccess();
+
+        data.clearAllEntityData();
         data.saveWorldData(level);
         data.setAnchorPlayerUUID(anchorPlayer.getUUID());
-        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            PlayerData pdataObject = new PlayerData();
-            pdataObject.posX = player.getX();
-            pdataObject.posY = player.getY();
-            pdataObject.posZ = player.getZ();
-            pdataObject.yaw = player.getYRot();
-            pdataObject.pitch = player.getXRot();
-            pdataObject.dimension = player.level().dimension();
-            GameType type = player.gameMode.getGameModeForPlayer();
-            pdataObject.gameMode = type.getName().toLowerCase(Locale.ROOT);
-
-            pdataObject.motionX = player.getDeltaMovement().x;
-            pdataObject.motionY = player.getDeltaMovement().y;
-            pdataObject.motionZ = player.getDeltaMovement().z;
-            pdataObject.fallDistance = player.fallDistance;
-
-            pdataObject.health = player.getHealth();
-            pdataObject.hunger = player.getFoodData().getFoodLevel();
-            pdataObject.experienceLevel = player.experienceLevel;
-            pdataObject.experienceProgress = player.experienceProgress;
-            pdataObject.fireTicks = player.getRemainingFireTicks();
-
-            BlockPos spawn = player.getRespawnPosition();
-            ResourceKey<Level> spawnDim = player.getRespawnDimension();
-            if (spawn != null && spawnDim != null) {
-                pdataObject.spawnX = spawn.getX() + 0.5;
-                pdataObject.spawnY = spawn.getY();
-                pdataObject.spawnZ = spawn.getZ() + 0.5;
-                pdataObject.spawnDimension = spawnDim;
-                pdataObject.spawnForced = player.isRespawnForced();
-            }
-
-            pdataObject.potionEffects.clear();
-            for (MobEffectInstance effect : player.getActiveEffects()) {
-                pdataObject.potionEffects.add(new MobEffectInstance(effect));
-            }
-
-            Inventory playerInventory = player.getInventory();
-            ListTag inventoryTag = new ListTag();
-            for (int i = 0; i < playerInventory.items.size(); ++i) {
-                ItemStack stack = playerInventory.items.get(i);
-                if (!stack.isEmpty()) {
-                    CompoundTag compoundtag = new CompoundTag();
-                    compoundtag.putByte("Slot", (byte) i);
-                    Tag savedItemTag = stack.save(player.registryAccess(), compoundtag);
-                    inventoryTag.add(savedItemTag);
-                }
-            }
-            for (int j = 0; j < playerInventory.armor.size(); ++j) {
-                ItemStack stack = playerInventory.armor.get(j);
-                if (!stack.isEmpty()) {
-                    CompoundTag compoundtag1 = new CompoundTag();
-                    compoundtag1.putByte("Slot", (byte) (j + 100));
-                    Tag savedItemTag = stack.save(player.registryAccess(), compoundtag1);
-                    inventoryTag.add(savedItemTag);
-                }
-            }
-            for (int k = 0; k < playerInventory.offhand.size(); ++k) {
-                ItemStack stack = playerInventory.offhand.get(k);
-                if (!stack.isEmpty()) {
-                    CompoundTag compoundtag2 = new CompoundTag();
-                    compoundtag2.putByte("Slot", (byte) (k + 150));
-                    Tag savedItemTag = stack.save(player.registryAccess(), compoundtag2);
-                    inventoryTag.add(savedItemTag);
-                }
-            }
-
-            pdataObject.inventoryNBT = inventoryTag;
-
-            logger.info("Saving inventory for player {}: Generated ListTag with {} entries. NBT: {}",
-                    player.getName().getString(), inventoryTag.size(), inventoryTag.toString());
-
-            CompoundTag capturedAdvancementsNBT = new CompoundTag();
-            if (player.server != null) {
-                for (AdvancementHolder advancementHolder : player.server.getAdvancements().getAllAdvancements()) {
-                    AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancementHolder);
-                    CompoundTag individualAdvancementProgressTag = new CompoundTag();
-                    if (progress != null) {
-                        for (String criterionName : progress.getCompletedCriteria()) {
-                            individualAdvancementProgressTag.putBoolean(criterionName, true);
-                        }
-                    }
-                    if (!individualAdvancementProgressTag.isEmpty()) {
-                        capturedAdvancementsNBT.put(advancementHolder.id().toString(), individualAdvancementProgressTag);
-                    }
-                }
-            }
-            pdataObject.advancements = capturedAdvancementsNBT;
-            CompoundTag playerDataNbt = pdataObject.toNBT(lookupProvider);
-            data.savePlayerData(player.getUUID(), playerDataNbt);
-        }
         data.setCheckpointDayTime(level.getDayTime());
+
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            saveSinglePlayer(data, player);
+        }
+
+        saveEntities(level, data);
+
+        long endTime = System.nanoTime();
+        LOGGER.debug("Checkpoint set in {} ms", (endTime - startTime) / 1_000_000);
+    }
+
+    public static void restoreCheckpoint(ServerPlayer anchorPlayer) {
+        isRestoring = true;
+        wasRestoredThisTick = true;
+        LOGGER.debug("Restoring checkpoint...");
+        long startTime = System.nanoTime();
+
+        try {
+            ServerLevel level = anchorPlayer.serverLevel();
+            CheckpointData data = CheckpointData.get(level);
+            HolderLookup.Provider lookupProvider = level.registryAccess();
+            
+            if (data.getPlayerData(data.getAnchorPlayerUUID(), lookupProvider) == null) {
+                LOGGER.error("Anchor player data is missing. Cannot restore.");
+                return;
+            }
+
+            restoreTimeAndWeather(level, data.getWorldData());
+            restoreBlocksAndFluids(level, data.getWorldData(), lookupProvider);
+            restorePlayers(level, data, lookupProvider);
+            restoreEntities(level, data);
+            restoreWorldExtras(level, data.getWorldData());
+
+            long endTime = System.nanoTime();
+            LOGGER.debug("Checkpoint restored in {} ms", (endTime - startTime) / 1_000_000);
+
+        } catch (Exception e) {
+            LOGGER.error("Critical error restoring checkpoint", e);
+        } finally {
+            isRestoring = false;
+        }
+    }
+
+    private static void saveSinglePlayer(CheckpointData data, ServerPlayer player) {
+        PlayerData pdata = new PlayerData();
+        pdata.posX = player.getX();
+        pdata.posY = player.getY();
+        pdata.posZ = player.getZ();
+        pdata.yaw = player.getYRot();
+        pdata.pitch = player.getXRot();
+        pdata.dimension = player.level().dimension();
+        pdata.gameMode = player.gameMode.getGameModeForPlayer().getName().toLowerCase(Locale.ROOT);
+        pdata.motionX = player.getDeltaMovement().x;
+        pdata.motionY = player.getDeltaMovement().y;
+        pdata.motionZ = player.getDeltaMovement().z;
+        pdata.fallDistance = player.fallDistance;
+        pdata.health = player.getHealth();
+        pdata.hunger = player.getFoodData().getFoodLevel();
+        pdata.experienceLevel = player.experienceLevel;
+        pdata.experienceProgress = player.experienceProgress;
+        pdata.fireTicks = player.getRemainingFireTicks();
+
+        BlockPos spawn = player.getRespawnPosition();
+        ResourceKey<Level> spawnDim = player.getRespawnDimension();
+        if (spawn != null && spawnDim != null) {
+            pdata.spawnX = spawn.getX() + 0.5;
+            pdata.spawnY = spawn.getY();
+            pdata.spawnZ = spawn.getZ() + 0.5;
+            pdata.spawnDimension = spawnDim;
+            pdata.spawnForced = player.isRespawnForced();
+        }
+
+        pdata.potionEffects.clear();
+        for (MobEffectInstance effect : player.getActiveEffects()) {
+            pdata.potionEffects.add(new MobEffectInstance(effect));
+        }
+
+        ListTag inventoryTag = new ListTag();
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (!stack.isEmpty()) {
+                CompoundTag itemTag = new CompoundTag();
+                itemTag.putByte("Slot", (byte)i);
+                stack.save(player.registryAccess(), itemTag);
+                inventoryTag.add(itemTag);
+            }
+        }
+        pdata.inventoryNBT = inventoryTag;
+
+        CompoundTag advTag = new CompoundTag();
+        for (AdvancementHolder advancement : player.server.getAdvancements().getAllAdvancements()) {
+            AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);
+            CompoundTag progressTag = new CompoundTag();
+            for (String criterion : progress.getCompletedCriteria()) {
+                progressTag.putBoolean(criterion, true);
+            }
+            advTag.put(advancement.id().toString(), progressTag);
+        }
+        pdata.advancements = advTag;
+
+        data.savePlayerData(player.getUUID(), pdata.toNBT(player.registryAccess()));
+    }
+
+    private static void saveEntities(ServerLevel level, CheckpointData data) {
         List<CompoundTag> entityList = new ArrayList<>();
         List<ResourceKey<Level>> entityDimensions = new ArrayList<>();
         Map<UUID, UUID> entityAggroTargets = new HashMap<>();
+        List<CompoundTag> groundItemsList = new ArrayList<>();
+
         for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
             for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof Mob mob) {
-                    CompoundTag entityNBT = new CompoundTag();
-                    entity.save(entityNBT);
+                if (entity instanceof ServerPlayer) continue;
+                if (entity instanceof PrimedTnt || entity instanceof LightningBolt || entity instanceof Projectile) continue;
 
-                    if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
+                if (entity instanceof ItemEntity) {
+                    CompoundTag itemNBT = new CompoundTag();
+                    if (entity.save(itemNBT)) groundItemsList.add(itemNBT);
+                    continue; 
+                }
+
+                if (shouldSaveEntity(entity)) {
+                    CompoundTag entityNBT = new CompoundTag();
+                    if (entity.save(entityNBT)) {
                         entityList.add(entityNBT);
                         entityDimensions.add(serverLevel.dimension());
-                        if (mob.getTarget() != null) {
+                        if (entity instanceof Mob mob && mob.getTarget() != null) {
                             entityAggroTargets.put(mob.getUUID(), mob.getTarget().getUUID());
                         }
-                    }
-                }
-            }
-        }
-        for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
-            for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof Mob) continue;
-
-                if (entity instanceof AbstractMinecart ||
-                        entity instanceof AreaEffectCloud ||
-                        entity instanceof Boat ||
-                        entity instanceof EndCrystal ||
-                        entity instanceof EvokerFangs ||
-                        entity instanceof ExperienceOrb ||
-                        entity instanceof EyeOfEnder ||
-                        entity instanceof FallingBlockEntity ||
-                        entity instanceof HangingEntity ||
-                        entity instanceof ItemEntity ||
-                        entity instanceof LightningBolt ||
-                        entity instanceof Marker ||
-                        entity instanceof PartEntity ||
-                        entity instanceof PrimedTnt ||
-                        entity instanceof Projectile ||
-                        entity instanceof ArmorStand) {
-
-                    CompoundTag entityNBT = new CompoundTag();
-                    entity.save(entityNBT);
-
-                    if (EntityType.byString(entityNBT.getString("id")).isPresent()) {
-                        entityList.add(entityNBT);
-                        entityDimensions.add(serverLevel.dimension());
                     }
                 }
             }
@@ -202,424 +204,331 @@ public class CheckpointManager {
 
         data.setEntityAggroTargets(entityAggroTargets);
         data.setEntityDataWithDimensions(entityList, entityDimensions);
-        List<CompoundTag> groundItemsList = new ArrayList<>();
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof ItemEntity itemEntity) {
-                CompoundTag itemNBT = new CompoundTag();
-                itemEntity.save(itemNBT);
-                groundItemsList.add(itemNBT);
-            }
-        }
         data.setGroundItems(groundItemsList);
-        long endTime = System.nanoTime();
-        long durationMs = (endTime - startTime) / 1_000_000;
-        logger.debug("Saving states took {} ms", durationMs);
-        logger.info("Checkpoint set");
-
     }
 
-    public static void restoreCheckpoint(ServerPlayer anchorPlayer) {
-        Logger logger = LogManager.getLogger();
-        logger.debug("Restoring checkpoint...");
+    private static boolean shouldSaveEntity(Entity entity) {
+        return entity instanceof Mob ||
+               entity instanceof AbstractMinecart ||
+               entity instanceof AreaEffectCloud ||
+               entity instanceof Boat ||
+               entity instanceof EndCrystal ||
+               entity instanceof EvokerFangs ||
+               entity instanceof ExperienceOrb ||
+               entity instanceof EyeOfEnder ||
+               entity instanceof FallingBlockEntity ||
+               entity instanceof HangingEntity ||
+               entity instanceof Marker ||
+               entity instanceof PartEntity ||
+               entity instanceof ArmorStand;
+    }
 
-        long startTime = System.nanoTime();
-        try {
-            ServerLevel level = anchorPlayer.serverLevel();
-            CheckpointData data = CheckpointData.get(level);
-            WorldData worldData = data.getWorldData();
-            HolderLookup.Provider lookupProvider = level.registryAccess();
-
-            if (data.getPlayerData(data.getAnchorPlayerUUID(), lookupProvider) == null) {
-                logger.error("Player data is null!");
-                return;
+    private static void restoreTimeAndWeather(ServerLevel level, WorldData worldData) {
+        level.setDayTime(worldData.getDayTime());
+        
+        if (level.getLevelData() instanceof ServerLevelData serverData) {
+            serverData.setGameTime(worldData.getGameTime());
+            if (serverData instanceof PrimaryLevelData primaryData) {
+                primaryData.setGameTime(worldData.getGameTime());
             }
-            level.setDayTime(worldData.getDayTime());
+            
+            serverData.setClearWeatherTime(worldData.getClearTime());
+            if (level.getLevelData() instanceof PrimaryLevelData primaryData) {
+                primaryData.setRaining(worldData.isRaining());
+                primaryData.setThundering(worldData.isThundering());
+            }
+            
+            if (worldData.isRaining()) {
+                serverData.setRainTime(worldData.getRainTime());
+                level.setRainLevel(1.0F);
+            } else {
+                serverData.setRainTime(0);
+                level.setRainLevel(0);
+            }
+            
+            if (worldData.isThundering()) {
+                serverData.setThunderTime(worldData.getThunderTime());
+                level.setThunderLevel(1.0F);
+            } else {
+                serverData.setThunderTime(0);
+                level.setThunderLevel(0);
+            }
+        }
 
-            if (level.getLevelData() instanceof ServerLevelData serverData) {
-                serverData.setGameTime(worldData.getGameTime());
-                if (serverData instanceof PrimaryLevelData primaryData) {
-                    primaryData.setGameTime(worldData.getGameTime());
+        for (ServerPlayer player : level.players()) {
+            player.connection.send(new ClientboundGameEventPacket(
+                    worldData.isRaining() ? ClientboundGameEventPacket.START_RAINING : ClientboundGameEventPacket.STOP_RAINING, 0.0F));
+            player.connection.send(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, worldData.isRaining() ? 1.0F : 0.0F));
+            player.connection.send(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, worldData.isThundering() ? 1.0F : 0.0F));
+        }
+    }
+
+    private static void restoreBlocksAndFluids(ServerLevel rootLevel, WorldData worldData, HolderLookup.Provider lookupProvider) {
+        Map<ResourceKey<Level>, ServerLevel> levelCache = new HashMap<>();
+
+        Function<BlockPos, ServerLevel> getLevel = (pos) -> {
+            if (!worldData.blockDimensionIndices.containsKey(pos)) return null;
+            int dimIndex = worldData.blockDimensionIndices.get(pos);
+            ResourceKey<Level> dimKey = WorldData.getDimensionFromIndex(dimIndex);
+            return levelCache.computeIfAbsent(dimKey, k -> rootLevel.getServer().getLevel(k));
+        };
+
+        for (BlockPos pos : worldData.modifiedBlocks) {
+            if (worldData.minedBlocks.containsKey(pos)) continue;
+            ServerLevel dimLevel = getLevel.apply(pos);
+            if (dimLevel != null && !dimLevel.getBlockState(pos).isAir()) {
+                dimLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
+
+        for (BlockPos pos : worldData.modifiedBlocks) {
+            ServerLevel dimLevel = getLevel.apply(pos);
+            if (dimLevel != null) cleanupFlowingFluid(dimLevel, pos);
+        }
+
+        List<Map.Entry<BlockPos, BlockState>> sortedRestoration = new ArrayList<>(worldData.minedBlocks.entrySet());
+        sortedRestoration.sort(Comparator.comparingInt(entry -> entry.getKey().getY()));
+
+        for (Map.Entry<BlockPos, BlockState> entry : sortedRestoration) {
+            BlockPos pos = entry.getKey();
+            ServerLevel dimLevel = getLevel.apply(pos);
+            if (dimLevel != null) {
+                dimLevel.setBlock(pos, entry.getValue(), 18);
+                
+                if (worldData.getBlockEntityData().containsKey(pos)) {
+                    restoreTileEntity(dimLevel, pos, worldData.getBlockEntityData().get(pos), lookupProvider);
+                }
+            }
+        }
+
+        List<Map.Entry<BlockPos, BlockState>> sortedFluid = new ArrayList<>(worldData.minedFluidBlocks.entrySet());
+        sortedFluid.sort(Comparator.comparingInt(entry -> entry.getKey().getY()));
+        for (Map.Entry<BlockPos, BlockState> entry : sortedFluid) {
+            ServerLevel dimLevel = getLevel.apply(entry.getKey());
+            if (dimLevel != null) dimLevel.setBlock(entry.getKey(), entry.getValue(), 18);
+        }
+
+        for (Map.Entry<ChunkPos, List<WorldData.SavedBlock>> entry : worldData.getSavedBlocksByChunk().entrySet()) {
+            List<WorldData.SavedBlock> savedBlocks = entry.getValue();
+            if (savedBlocks.isEmpty()) continue;
+            ServerLevel dimLevel = rootLevel.getServer().getLevel(savedBlocks.get(0).dimension());
+            if (dimLevel == null) continue;
+
+            for (WorldData.SavedBlock saved : savedBlocks) {
+                if (!dimLevel.getBlockState(saved.pos()).getBlock().equals(saved.state().getBlock())) {
+                    dimLevel.setBlock(saved.pos(), saved.state(), 2);
+                }
+            }
+        }
+
+        for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
+            if (worldData.minedBlocks.containsKey(entry.getKey())) continue;
+            ServerLevel dimLevel = getLevel.apply(entry.getKey());
+            if (dimLevel != null) restoreTileEntity(dimLevel, entry.getKey(), entry.getValue(), lookupProvider);
+        }
+    }
+
+    private static void restoreTileEntity(ServerLevel level, BlockPos pos, CompoundTag tag, HolderLookup.Provider lookupProvider) {
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity != null) {
+            blockEntity.loadWithComponents(tag, lookupProvider);
+            blockEntity.setChanged();
+            level.sendBlockUpdated(pos, blockEntity.getBlockState(), blockEntity.getBlockState(), 3);
+        }
+    }
+
+    private static void cleanupFlowingFluid(ServerLevel level, BlockPos pos) {
+        BlockState currentState = level.getBlockState(pos);
+        if (currentState.getBlock() instanceof LiquidBlock) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        } else if (currentState.hasProperty(BlockStateProperties.WATERLOGGED) && currentState.getValue(BlockStateProperties.WATERLOGGED)) {
+            level.setBlock(pos, currentState.setValue(BlockStateProperties.WATERLOGGED, false), 3);
+        }
+    }
+
+    private static void restorePlayers(ServerLevel rootLevel, CheckpointData data, HolderLookup.Provider lookupProvider) {
+        for (ServerPlayer player : rootLevel.getServer().getPlayerList().getPlayers()) {
+            PlayerData pdata = data.getPlayerData(player.getUUID(), lookupProvider);
+            if (pdata == null) continue;
+
+            ServerLevel targetLevel = rootLevel.getServer().getLevel(pdata.dimension);
+            if (targetLevel != null) {
+                player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+            }
+
+            player.setHealth(pdata.health);
+            player.getFoodData().setFoodLevel(pdata.hunger);
+            player.setExperienceLevels(pdata.experienceLevel);
+            player.experienceProgress = pdata.experienceProgress;
+            player.setRemainingFireTicks(pdata.fireTicks);
+            
+            if (pdata.gameMode != null) {
+                switch (pdata.gameMode.toLowerCase()) {
+                    case "survival" -> player.setGameMode(GameType.SURVIVAL);
+                    case "creative" -> player.setGameMode(GameType.CREATIVE);
+                    case "adventure" -> player.setGameMode(GameType.ADVENTURE);
+                    case "spectator" -> player.setGameMode(GameType.SPECTATOR);
                 }
             }
 
-            if (level.getLevelData() instanceof ServerLevelData serverData) {
-                if (serverData instanceof PrimaryLevelData primaryData) {
-                    primaryData.setRaining(worldData.isRaining());
-                    primaryData.setThundering(worldData.isThundering());
+            if (pdata.spawnDimension != null) {
+                player.setRespawnPosition(pdata.spawnDimension, new BlockPos((int) pdata.spawnX, (int) pdata.spawnY, (int) pdata.spawnZ), pdata.yaw, true, false);
+            }
+
+            player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));
+            player.fallDistance = pdata.fallDistance;
+            
+            player.removeAllEffects();
+            for (MobEffectInstance effect : pdata.potionEffects) {
+                player.addEffect(new MobEffectInstance(effect));
+            }
+
+            player.getInventory().clearContent();
+            ListTag savedNbt = pdata.inventoryNBT;
+            for (int i = 0; i < savedNbt.size(); ++i) {
+                CompoundTag itemTag = savedNbt.getCompound(i);
+                int slot = itemTag.getByte("Slot") & 255;
+                Optional<ItemStack> parsed = ItemStack.parse(lookupProvider, itemTag);
+                if (parsed.isPresent()) {
+                    ItemStack stack = parsed.get().copy();
+                    if (slot < player.getInventory().items.size()) {
+                        player.getInventory().items.set(slot, stack);
+                    } else if (slot >= 100 && slot < player.getInventory().armor.size() + 100) {
+                        player.getInventory().armor.set(slot - 100, stack);
+                    } else if (slot >= 150 && slot < player.getInventory().offhand.size() + 150) {
+                        player.getInventory().offhand.set(slot - 150, stack);
+                    }
                 }
-                serverData.setClearWeatherTime(worldData.getClearTime());
+            }
+            
+            CompoundTag savedAdvTag = pdata.advancements;
+            ServerAdvancementManager advManager = rootLevel.getServer().getAdvancements();
+            for (AdvancementHolder advancementHolder : advManager.getAllAdvancements()) {
+                AdvancementProgress currentProgress = player.getAdvancements().getOrStartProgress(advancementHolder);
+                CompoundTag savedProgressTag = null;
+                String advKey = advancementHolder.id().toString();
+                if (savedAdvTag.contains(advKey)) savedProgressTag = savedAdvTag.getCompound(advKey);
 
+                for (String criterion : advancementHolder.value().criteria().keySet()) {
+                    boolean wasCompleted = savedProgressTag != null && savedProgressTag.getBoolean(criterion);
+                    boolean isCompleted = currentProgress.getCriterion(criterion).isDone();
 
-                if (worldData.isRaining()) {
-                    serverData.setRainTime(worldData.getRainTime());
-                    level.setRainLevel(1.0F);
+                    if (isCompleted && !wasCompleted) player.getAdvancements().revoke(advancementHolder, criterion);
+                    else if (!isCompleted && wasCompleted) player.getAdvancements().award(advancementHolder, criterion);
+                }
+            }
+        }
+    }
+
+    private static void restoreEntities(ServerLevel rootLevel, CheckpointData data) {
+        List<Entity> entitiesToRemove = new ArrayList<>();
+        for (ServerLevel serverLevel : rootLevel.getServer().getAllLevels()) {
+            for (Entity entity : serverLevel.getAllEntities()) {
+                if (entity instanceof ServerPlayer || entity.isRemoved()) continue;
+
+                if (data.isEntitySaved(entity.getUUID())) {
+                    entitiesToRemove.add(entity);
                 } else {
-                    serverData.setRainTime(0);
-                    level.setRainLevel(0);
-                }
-
-                if (worldData.isThundering()) {
-                    serverData.setThunderTime(worldData.getThunderTime());
-                    level.setThunderLevel(1.0F);
-                } else {
-                    serverData.setThunderTime(0);
-                    level.setThunderLevel(0);
-                }
-            }
-
-            for (ServerPlayer player : level.players()) {
-                player.connection.send(new ClientboundGameEventPacket(
-                        worldData.isRaining() ? ClientboundGameEventPacket.START_RAINING : ClientboundGameEventPacket.STOP_RAINING,
-                        0.0F
-                ));
-                player.connection.send(new ClientboundGameEventPacket(
-                        ClientboundGameEventPacket.RAIN_LEVEL_CHANGE,
-                        worldData.isRaining() ? 1.0F : 0.0F
-                ));
-
-                player.connection.send(new ClientboundGameEventPacket(
-                        ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE,
-                        worldData.isThundering() ? 1.0F : 0.0F
-                ));
-            }
-            for (BlockPos pos : worldData.modifiedBlocks) {
-                int dimIndex = worldData.blockDimensionIndices.get(pos);
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
-
-                if (dimLevel != null) {
-                    BlockState currentState = dimLevel.getBlockState(pos);
-                    if (!currentState.isAir()) {
-                        dimLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-                    }
-                }
-            }
-            for (Map.Entry<BlockPos, BlockState> entry : worldData.minedBlocks.entrySet()) {
-                BlockPos pos = entry.getKey();
-                BlockState originalState = entry.getValue();
-                int dimIndex = worldData.blockDimensionIndices.get(pos);
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
-
-                if (dimLevel != null) {
-                    BlockState currentState = dimLevel.getBlockState(pos);
-                    if (currentState.isAir()) {
-                        dimLevel.setBlock(pos, originalState, 2);
-                    }
-                }
-            }
-
-            for (BlockPos pos : worldData.modifiedFluidBlocks) {
-
-
-                if (!worldData.blockDimensionIndices.containsKey(pos)) {
-                    logger.info("No dimension index for modified fluid block at " + pos);
-                    continue;
-                }
-
-                logger.debug("Restoring fluid block at " + pos);
-
-                int dimIndex = worldData.blockDimensionIndices.get(pos);
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
-                if (dimLevel != null) {
-                    BlockState currentState = dimLevel.getBlockState(pos);
-                    if (!currentState.isAir()) {
-                        dimLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-                    }
-                }
-            }
-            for (Map.Entry<BlockPos, BlockState> entry : worldData.minedFluidBlocks.entrySet()) {
-                BlockPos pos = entry.getKey();
-                BlockState originalState = entry.getValue();
-
-                if (!worldData.blockDimensionIndices.containsKey(pos)) {
-                    logger.info("No dimension index for modified fluid block at " + pos);
-                    continue;
-                }
-
-                int dimIndex = worldData.blockDimensionIndices.get(pos);
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndex));
-                if (dimLevel != null) {
-                    BlockState currentState = dimLevel.getBlockState(pos);
-                    if (currentState.isAir()) {
-                        dimLevel.setBlock(pos, originalState, 3);
-                    }
-                }
-            }
-
-
-            int totalSaved = 0;
-            int updateCount = 0;
-            Map<ChunkPos, List<WorldData.SavedBlock>> savedBlocksByChunk = worldData.getSavedBlocksByChunk();
-
-            for (Map.Entry<ChunkPos, List<WorldData.SavedBlock>> entry : savedBlocksByChunk.entrySet()) {
-                List<WorldData.SavedBlock> savedBlocks = entry.getValue();
-                totalSaved += savedBlocks.size();
-                ResourceKey<Level> dimension = savedBlocks.get(0).dimension();
-                ServerLevel dimLevel = level.getServer().getLevel(dimension);
-
-                if (dimLevel == null) continue;
-
-                for (WorldData.SavedBlock saved : savedBlocks) {
-                    BlockState currentState = dimLevel.getBlockState(saved.pos());
-                    if (!currentState.getBlock().equals(saved.state().getBlock())) {
-                        updateCount++;
-                        dimLevel.setBlock(saved.pos(), saved.state(), 2);
-                    }
-                }
-            }
-            for (Map.Entry<BlockPos, CompoundTag> entry : worldData.getBlockEntityData().entrySet()) {
-                BlockPos pos = entry.getKey();
-                CompoundTag blockEntityNbt = entry.getValue();
-
-                Integer dimIndexInt = worldData.getInstanceBlockDimensionIndices().get(pos);
-                if (dimIndexInt == null) {
-                    logger.warn("No dimension index found for BlockEntity at {}. Skipping restoration.", pos);
-                    continue;
-                }
-                ServerLevel dimLevel = level.getServer().getLevel(WorldData.getDimensionFromIndex(dimIndexInt));
-
-                if (dimLevel != null) {
-                    BlockEntity blockEntity = dimLevel.getBlockEntity(pos);
-                    if (blockEntity != null) {
-                        blockEntity.loadWithComponents(blockEntityNbt, lookupProvider);
-
-                        blockEntity.setChanged();
-                    } else {
-                        logger.warn("No BlockEntity found at {} in dimension {} during restoration, though NBT was saved.",
-                                pos, dimLevel.dimension().location());
-                    }
-                } else {
-                    logger.warn("Dimension level for index {} (BlockEntity at {}) not found during restoration.", dimIndexInt, pos);
-                }
-            }
-            for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-                PlayerData pdata = data.getPlayerData(player.getUUID(), lookupProvider);
-                if (pdata != null) {
-                    if (!player.level().dimension().equals(pdata.dimension)) {
-                        ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
-                        if (targetLevel != null) {
-                            player.setHealth(pdata.health);
-                            player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
-                        }
-                    } else {
-                        player.setHealth(pdata.health);
-                        ServerLevel targetLevel = player.getServer().getLevel(pdata.dimension);
-                        player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
-
-                    }
-                    player.getFoodData().setFoodLevel(pdata.hunger);
-                    player.setExperienceLevels(pdata.experienceLevel);
-                    player.experienceProgress = pdata.experienceProgress;
-
-
-                    player.setRemainingFireTicks(pdata.fireTicks);
-                    if (pdata.gameMode != null) {
-                        switch (pdata.gameMode.toLowerCase()) {
-                            case "survival" -> player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
-                            case "creative" -> player.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
-                            case "adventure" -> player.setGameMode(net.minecraft.world.level.GameType.ADVENTURE);
-                            case "spectator" -> player.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
-                        }
-                    }
-
-
-                    if (pdata.spawnDimension != null) {
-                        player.setRespawnPosition(
-                                pdata.spawnDimension,
-                                new BlockPos((int)pdata.spawnX, (int)pdata.spawnY, (int)pdata.spawnZ),
-                                pdata.yaw,
-                                true,
-                                false
-                        );
-                    }
-
-
-
-                    player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));
-                    player.fallDistance = pdata.fallDistance;
-                    player.removeAllEffects();
-                    for (MobEffectInstance effect : pdata.potionEffects) {
-                        player.addEffect(new MobEffectInstance(effect));
-                    }
-                    CompoundTag savedAdvTag = pdata.advancements;
-                    ServerAdvancementManager advManager = level.getServer().getAdvancements();
-                    for (AdvancementHolder advancementHolder : advManager.getAllAdvancements()) {
-                        AdvancementProgress currentProgress = player.getAdvancements().getOrStartProgress(advancementHolder);
-
-                        CompoundTag savedProgressTagForThisAdv = null;
-                        String advKey = advancementHolder.id().toString();
-                        if (savedAdvTag.contains(advKey)) {
-                            savedProgressTagForThisAdv = savedAdvTag.getCompound(advKey);
-                        }
-                        Advancement advancementInstance = advancementHolder.value();
-                        for (String criterionName : advancementInstance.criteria().keySet()) {
-                            boolean wasCompletedInSave = savedProgressTagForThisAdv != null && savedProgressTagForThisAdv.getBoolean(criterionName);
-                            boolean isCurrentlyCompleted = false;
-                            if (currentProgress.getCriterion(criterionName) != null) {
-                                isCurrentlyCompleted = currentProgress.getCriterion(criterionName).isDone();
-                            }
-
-
-                            if (isCurrentlyCompleted && !wasCompletedInSave) {
-                                player.getAdvancements().revoke(advancementHolder, criterionName);
-                                logger.trace("Revoked advancement criterion '{}' for {} on player {}", criterionName, advKey, player.getName().getString());
-                            } else if (!isCurrentlyCompleted && wasCompletedInSave) {
-                                player.getAdvancements().award(advancementHolder, criterionName);
-                                logger.trace("Awarded advancement criterion '{}' for {} on player {}", criterionName, advKey, player.getName().getString());
-                            }
-                        }
-                    }
-                    Inventory playerInventory = player.getInventory();
-                    playerInventory.clearContent();
-
-                    ListTag savedNbt = pdata.inventoryNBT;
-                    logger.info("Restoring inventory for {}. Received ListTag with {} entries.",
-                            player.getName().getString(), savedNbt.size());
-
-                    if (savedNbt.isEmpty()) {
-                        logger.warn("The saved inventory NBT for {} was empty. Nothing to restore.", player.getName().getString());
-                    }
-
-                    for (int i = 0; i < savedNbt.size(); ++i) {
-                        CompoundTag itemTag = savedNbt.getCompound(i);
-                        int slot = itemTag.getByte("Slot") & 255;
-
-                        logger.debug("  -> Processing item tag for slot {}: {}", slot, itemTag.toString());
-
-                        if(lookupProvider == null) {
-                            logger.error("CRITICAL: The HolderLookup.Provider is NULL during restore! ItemStack.parse will fail.");
-                        }
-                        Optional<ItemStack> parsedStackOptional = ItemStack.parse(lookupProvider, itemTag);
-
-                        if (parsedStackOptional.isPresent()) {
-                            ItemStack itemstack = parsedStackOptional.get();
-                            if (!itemstack.isEmpty()) {
-                                logger.info("  Successfully parsed item: {} for slot {}", itemstack, slot);
-
-                                if (slot >= 0 && slot < playerInventory.items.size()) {
-                                    playerInventory.items.set(slot, itemstack);
-                                    logger.debug("    -> Placed in main inventory at index {}.", slot);
-                                } else if (slot >= 100 && slot < playerInventory.armor.size() + 100) {
-                                    playerInventory.armor.set(slot - 100, itemstack);
-                                    logger.debug("    -> Placed in armor inventory at index {}.", slot - 100);
-                                } else if (slot >= 150 && slot < playerInventory.offhand.size() + 150) {
-                                    playerInventory.offhand.set(slot - 150, itemstack);
-                                    logger.debug("    -> Placed in offhand inventory at index {}.", slot - 150);
-                                } else {
-                                    logger.warn("    -> Parsed item for an invalid slot number: {}. Item will be lost.", slot);
-                                }
-                            } else {
-                                logger.warn("  ItemStack.parse resulted in an EMPTY stack for slot {}. Original tag: {}", slot, itemTag);
-                            }
-                        } else {
-                            logger.error("  FAILED to parse ItemStack from NBT for slot {}. Original tag: {}", slot, itemTag);
-                        }
-                    }
-
-
-
-
-                }
-            }
-            List<Entity> entitiesToRemove = new ArrayList<>();
-            for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
-                for (Entity entity : serverLevel.getAllEntities()) {
-                    if (!(entity instanceof ServerPlayer) && !entity.isRemoved()) {
+                    if (entity instanceof Enemy || 
+                        entity instanceof Projectile || 
+                        entity instanceof ItemEntity || 
+                        entity instanceof ExperienceOrb || 
+                        entity instanceof PrimedTnt || 
+                        entity instanceof FallingBlockEntity) {
                         entitiesToRemove.add(entity);
                     }
                 }
-                for (Entity entity : entitiesToRemove) {
-                    entity.discard();
-                }
-                entitiesToRemove.clear();
             }
+            for (Entity e : entitiesToRemove) e.discard();
+            entitiesToRemove.clear();
+        }
 
-            List<CompoundTag> entities = data.getEntityData();
-            List<ResourceKey<Level>> entityDimensions = data.getEntityDimensions();
-            Map<UUID, UUID> entityAggroTargets = data.getEntityAggroTargets();
-            Map<UUID, Mob> restoredMobs = new HashMap<>();
-            for (int i = 0; i < entities.size(); i++) {
-                CompoundTag eNBT = entities.get(i);
-                ResourceKey<Level> entityDim = entityDimensions.get(i);
+        Map<UUID, Mob> restoredMobs = new HashMap<>();
 
-                ServerLevel targetLevel = level.getServer().getLevel(entityDim);
-                if (targetLevel != null) {
-                    EntityType.loadEntityRecursive(eNBT, targetLevel, (entity) -> {
-                        if (entity != null) {
-                            targetLevel.addFreshEntity(entity);
-                            if (entity instanceof Mob mob) {
-                                restoredMobs.put(mob.getUUID(), mob);
-                            }
-                        }
-                        return entity;
-                    });
-                }
-            }
-            for (Map.Entry<UUID, UUID> entry : entityAggroTargets.entrySet()) {
-                UUID mobUUID = entry.getKey();
-                UUID targetUUID = entry.getValue();
+        restoreEntityList(rootLevel, data.getEntityData(), data.getEntityDimensions(), restoredMobs);
 
-                if (restoredMobs.containsKey(mobUUID) && restoredMobs.containsKey(targetUUID)) {
-                    Mob mob = restoredMobs.get(mobUUID);
-                    Entity target = restoredMobs.get(targetUUID);
+        Map<UUID, CompoundTag> dynamicEntities = data.getDynamicEntityData();
+        Map<UUID, String> dynamicDims = data.getDynamicEntityDimensions();
+        
+        for (Map.Entry<UUID, CompoundTag> entry : dynamicEntities.entrySet()) {
+            UUID uuid = entry.getKey();
+            if (restoredMobs.containsKey(uuid)) continue;
 
-                    if (target instanceof Mob || target instanceof ServerPlayer) {
-                        mob.setTarget((Mob) target);
+            CompoundTag nbt = entry.getValue();
+            String dimStr = dynamicDims.get(uuid);
+            ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(dimStr));
+            ServerLevel level = rootLevel.getServer().getLevel(dimKey);
+
+            if (level != null) {
+                if (nbt.contains("Pos", 9)) {
+                    ListTag pos = nbt.getList("Pos", 6);
+                    int cx = SectionPos.blockToSectionCoord(pos.getDouble(0));
+                    int cz = SectionPos.blockToSectionCoord(pos.getDouble(2));
+                    if (!level.getChunkSource().hasChunk(cx, cz)) {
+                         level.getChunk(cx, cz);
                     }
                 }
+                
+                Entity existing = level.getEntity(uuid);
+                if (existing != null && !existing.isRemoved()) existing.discard();
+
+                EntityType.loadEntityRecursive(nbt, level, (e) -> {
+                    if (e != null) {
+                        level.addFreshEntity(e);
+                        if (e instanceof Mob m) restoredMobs.put(m.getUUID(), m);
+                    }
+                    return e;
+                });
             }
-            List<CompoundTag> groundItemsList = data.getGroundItems();
-            if (groundItemsList != null) {
-                for (CompoundTag itemNBT : groundItemsList) {
-                    EntityType.loadEntityRecursive(itemNBT, level, (entity) -> {
-                        if (entity instanceof ItemEntity) {
-                            level.addFreshEntity(entity);
-                        }
-                        return entity;
-                    });
-                }
+        }
+
+        for (Map.Entry<UUID, UUID> entry : data.getEntityAggroTargets().entrySet()) {
+            if (restoredMobs.containsKey(entry.getKey()) && restoredMobs.containsKey(entry.getValue())) {
+                restoredMobs.get(entry.getKey()).setTarget(restoredMobs.get(entry.getValue()));
             }
+        }
 
-            for (BlockPos eyePos : worldData.addedEyes) {
-                BlockState state = level.getBlockState(eyePos);
-                if (state.getBlock() == Blocks.END_PORTAL_FRAME && state.getValue(EndPortalFrameBlock.HAS_EYE)) {
-                    level.setBlock(eyePos, state.setValue(EndPortalFrameBlock.HAS_EYE, false), 3);
-                }
+        if (data.getGroundItems() != null) {
+            for (CompoundTag nbt : data.getGroundItems()) {
+                EntityType.loadEntityRecursive(nbt, rootLevel, (e) -> {
+                    if (e instanceof ItemEntity) rootLevel.addFreshEntity(e);
+                    return e;
+                });
             }
-
-
-
-
-
-
-
-
-            List<WorldData.LightningStrike> strikes = worldData.getSavedLightnings();
-            for (WorldData.LightningStrike strike : strikes) {
-
-                long delay = strike.tickTime - level.getGameTime();
-                if (delay < 0) delay = 1;
-
-                LightningScheduler.schedule(level, strike.pos, strike.tickTime);
-
-            }
-            for (BlockPos firePos : worldData.getNewFires()) {
-                if (level.getBlockState(firePos).getBlock() == Blocks.FIRE) {
-                    level.setBlockAndUpdate(firePos, Blocks.AIR.defaultBlockState());
-                }
-            }
-
-
-
-            long endTime = System.nanoTime();
-            long durationMs = (endTime - startTime) / 1_000_000;
-            logger.debug("Restoring states took {} ms", durationMs);
-
-
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-            e.printStackTrace();
         }
     }
 
+    private static void restoreEntityList(ServerLevel rootLevel, List<CompoundTag> nbts, List<ResourceKey<Level>> dims, Map<UUID, Mob> mobMap) {
+        for (int i = 0; i < nbts.size(); i++) {
+            ServerLevel level = rootLevel.getServer().getLevel(dims.get(i));
+            if (level != null) {
+                EntityType.loadEntityRecursive(nbts.get(i), level, (e) -> {
+                    if (e != null) {
+                        level.addFreshEntity(e);
+                        if (e instanceof Mob m) mobMap.put(m.getUUID(), m);
+                    }
+                    return e;
+                });
+            }
+        }
+    }
 
+    private static void restoreWorldExtras(ServerLevel level, WorldData worldData) {
+        for (BlockPos eyePos : worldData.addedEyes) {
+            BlockState state = level.getBlockState(eyePos);
+            if (state.getBlock() == Blocks.END_PORTAL_FRAME && state.getValue(EndPortalFrameBlock.HAS_EYE)) {
+                level.setBlock(eyePos, state.setValue(EndPortalFrameBlock.HAS_EYE, false), 3);
+            }
+        }
+        for (WorldData.LightningStrike strike : worldData.getSavedLightnings()) {
+            long delay = strike.tickTime - level.getGameTime();
+            if (delay < 0) delay = 1;
+            LightningScheduler.schedule(level, strike.pos, strike.tickTime);
+        }
+        for (BlockPos firePos : worldData.getNewFires()) {
+            if (level.getBlockState(firePos).getBlock() == Blocks.FIRE) {
+                level.setBlockAndUpdate(firePos, Blocks.AIR.defaultBlockState());
+            }
+        }
+    }
 }

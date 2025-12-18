@@ -50,7 +50,6 @@ import org.slf4j.Logger;
 
 import java.util.Locale;
 
-
 @Mod(MineZero.MODID)
 public class MineZero {
 
@@ -81,16 +80,12 @@ public class MineZero {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new DeathEventHandler());
 
-        NeoForge.EVENT_BUS.register(BlockChangeListener.class);
         NeoForge.EVENT_BUS.register(CheckpointTicker.class);
         NeoForge.EVENT_BUS.register(ExplosionEventHandler.class);
         NeoForge.EVENT_BUS.register(GlobalTickHandler.class);
         NeoForge.EVENT_BUS.register(LightningStrikeListener.class);
         NeoForge.EVENT_BUS.register(NonPlayerChangeHandler.class);
-
-
-
-
+        NeoForge.EVENT_BUS.register(EntityTracker.class);
 
         if (modContainer != null) {
             modContainer.registerConfig(ModConfig.Type.COMMON, ConfigHandler.COMMON_CONFIG_SPEC);
@@ -124,7 +119,6 @@ public class MineZero {
             event.accept(ARTIFACT_FLUTE.get());
         }
     }
-
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
@@ -190,7 +184,6 @@ public class MineZero {
                 }
             }
 
-
             for (int j = 0; j < playerInventory.armor.size(); ++j) {
                 if (!playerInventory.armor.get(j).isEmpty()) {
                     CompoundTag compoundtag1 = new CompoundTag();
@@ -200,7 +193,6 @@ public class MineZero {
                 }
             }
 
-
             for (int k = 0; k < playerInventory.offhand.size(); ++k) {
                 if (!playerInventory.offhand.get(k).isEmpty()) {
                     CompoundTag compoundtag2 = new CompoundTag();
@@ -209,7 +201,6 @@ public class MineZero {
                     inventoryTag.add(compoundtag2);
                 }
             }
-
 
             pDataForNewPlayer.inventoryNBT = inventoryTag;
 
@@ -236,16 +227,13 @@ public class MineZero {
         }
     }
 
-
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("HELLO from server starting");
     }
 
-
     private void clientSetup(final FMLClientSetupEvent event) {
         LOGGER.info("HELLO FROM CLIENT SETUP (Mod Event Bus)");
-
 
         NeoForge.EVENT_BUS.register(ClientForgeEvents.class);
 

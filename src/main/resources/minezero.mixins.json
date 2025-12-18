@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "boomcow.minezero.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "minezero.refmap.json",
+  "mixins": [
+    "MixinLevelChunk",
+    "MixinExplosion"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
