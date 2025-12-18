@@ -1,5 +1,6 @@
 package boomcow.minezero.event;
 
+import boomcow.minezero.checkpoint.CheckpointManager;
 import boomcow.minezero.util.LightningScheduler;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
@@ -16,6 +17,7 @@ public class GlobalTickHandler {
             for (ServerLevel level : ServerLifecycleHooks.getCurrentServer().getAllLevels()) {
                 LightningScheduler.tick(level);
             }
+            CheckpointManager.wasRestoredThisTick = false;
         }
     }
 }

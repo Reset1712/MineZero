@@ -94,7 +94,6 @@ public class MineZero {
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("HELLO FROM COMMON SETUP");
-        LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
         LOGGER.info("Loading custom game rules: autoCheckpointEnabled = {}", ModGameRules.AUTO_CHECKPOINT_ENABLED);
     }
 
@@ -210,11 +209,8 @@ public class MineZero {
             LOGGER.info("[MineZero][LOGIN] Player {} added to checkpoint with their current state.",
                     player.getName().getString());
         } else {
-
             LOGGER.info("[MineZero][LOGIN] Player {} (UUID: {}) already has data in the checkpoint.",
                     player.getName().getString(), player.getUUID());
-            LOGGER.info("[MineZero][LOGIN] Player UUID = {}, Stored Anchor = {}",
-                    player.getUUID(), data.getAnchorPlayerUUID());
         }
     }
 
@@ -230,7 +226,6 @@ public class MineZero {
         public static void onClientSetup(FMLClientSetupEvent event) {
             LOGGER.info("HELLO FROM CLIENT SETUP");
             LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
-
         }
 
         @SubscribeEvent
