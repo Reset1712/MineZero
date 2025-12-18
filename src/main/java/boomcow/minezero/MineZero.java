@@ -172,37 +172,7 @@ public class MineZero {
                 pDataForNewPlayer.potionEffects.add(new MobEffectInstance(effectInstance));
             }
 
-            Inventory playerInventory = player.getInventory();
-            ListTag inventoryTag = new ListTag();
-
-            for (int i = 0; i < playerInventory.items.size(); ++i) {
-                if (!playerInventory.items.get(i).isEmpty()) {
-                    CompoundTag compoundtag = new CompoundTag();
-                    compoundtag.putByte("Slot", (byte) i);
-                    playerInventory.items.get(i).save(player.registryAccess(), compoundtag);
-                    inventoryTag.add(compoundtag);
-                }
-            }
-
-            for (int j = 0; j < playerInventory.armor.size(); ++j) {
-                if (!playerInventory.armor.get(j).isEmpty()) {
-                    CompoundTag compoundtag1 = new CompoundTag();
-                    compoundtag1.putByte("Slot", (byte) (j + 100));
-                    playerInventory.armor.get(j).save(player.registryAccess(), compoundtag1);
-                    inventoryTag.add(compoundtag1);
-                }
-            }
-
-            for (int k = 0; k < playerInventory.offhand.size(); ++k) {
-                if (!playerInventory.offhand.get(k).isEmpty()) {
-                    CompoundTag compoundtag2 = new CompoundTag();
-                    compoundtag2.putByte("Slot", (byte) (k + 150));
-                    playerInventory.offhand.get(k).save(player.registryAccess(), compoundtag2);
-                    inventoryTag.add(compoundtag2);
-                }
-            }
-
-            pDataForNewPlayer.inventoryNBT = inventoryTag;
+            pDataForNewPlayer.inventoryNBT = player.getInventory().save(new ListTag());
 
             CompoundTag advTag = new CompoundTag();
             if (player.server != null) {

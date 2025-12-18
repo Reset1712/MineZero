@@ -1,11 +1,9 @@
 package boomcow.minezero.checkpoint;
 
 import boomcow.minezero.util.LightningScheduler;
-import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
@@ -31,7 +29,6 @@ import net.minecraft.world.entity.projectile.EyeOfEnder;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.entity.vehicle.Boat;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -41,8 +38,6 @@ import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.storage.PrimaryLevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.phys.Vec3;
@@ -146,17 +141,7 @@ public class CheckpointManager {
             pdata.potionEffects.add(new MobEffectInstance(effect));
         }
 
-        ListTag inventoryTag = new ListTag();
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (!stack.isEmpty()) {
-                CompoundTag itemTag = new CompoundTag();
-                itemTag.putByte("Slot", (byte)i);
-                stack.save(player.registryAccess(), itemTag);
-                inventoryTag.add(itemTag);
-            }
-        }
-        pdata.inventoryNBT = inventoryTag;
+        pdata.inventoryNBT = player.getInventory().save(new ListTag());
 
         CompoundTag advTag = new CompoundTag();
         for (AdvancementHolder advancement : player.server.getAdvancements().getAllAdvancements()) {
@@ -384,22 +369,7 @@ public class CheckpointManager {
             }
 
             player.getInventory().clearContent();
-            ListTag savedNbt = pdata.inventoryNBT;
-            for (int i = 0; i < savedNbt.size(); ++i) {
-                CompoundTag itemTag = savedNbt.getCompound(i);
-                int slot = itemTag.getByte("Slot") & 255;
-                Optional<ItemStack> parsed = ItemStack.parse(lookupProvider, itemTag);
-                if (parsed.isPresent()) {
-                    ItemStack stack = parsed.get().copy();
-                    if (slot < player.getInventory().items.size()) {
-                        player.getInventory().items.set(slot, stack);
-                    } else if (slot >= 100 && slot < player.getInventory().armor.size() + 100) {
-                        player.getInventory().armor.set(slot - 100, stack);
-                    } else if (slot >= 150 && slot < player.getInventory().offhand.size() + 150) {
-                        player.getInventory().offhand.set(slot - 150, stack);
-                    }
-                }
-            }
+            player.getInventory().load(pdata.inventoryNBT);
             
             CompoundTag savedAdvTag = pdata.advancements;
             ServerAdvancementManager advManager = rootLevel.getServer().getAdvancements();
