@@ -29,13 +29,11 @@ public class CheckpointTicker {
 
     private static final Logger LOGGER = LogManager.getLogger(CheckpointTicker.class);
 
-    private static int ticksSinceLastCheckpoint = 0;
-    private static int currentTargetInterval = -1;
+    private static long nextCheckpointTargetTick = -1;
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        ticksSinceLastCheckpoint = 0;
-        currentTargetInterval = -1;
+        nextCheckpointTargetTick = -1;
     }
 
     @SubscribeEvent
@@ -45,13 +43,16 @@ public class CheckpointTicker {
         if (level == null) return;
 
         if (!level.getGameRules().getBoolean(ModGameRules.AUTO_CHECKPOINT_ENABLED)) {
+            nextCheckpointTargetTick = -1; 
             return;
         }
 
-        ticksSinceLastCheckpoint++;
+        long currentTick = server.getTickCount();
 
-        if (currentTargetInterval == -1) {
+        if (nextCheckpointTargetTick == -1) {
+            int intervalTicks;
             boolean useRandom = level.getGameRules().getBoolean(ModGameRules.USE_RANDOM_INTERVAL);
+
             if (useRandom) {
                 int lowerSeconds = level.getGameRules().getInt(ModGameRules.RANDOM_CHECKPOINT_LOWER_BOUND);
                 int upperSeconds = level.getGameRules().getInt(ModGameRules.RANDOM_CHECKPOINT_UPPER_BOUND);
@@ -61,14 +62,17 @@ public class CheckpointTicker {
                 }
 
                 int randomSeconds = lowerSeconds + ThreadLocalRandom.current().nextInt(upperSeconds - lowerSeconds);
-                currentTargetInterval = randomSeconds * 20;
-                LOGGER.debug("Next random checkpoint interval: {} seconds", randomSeconds);
+                intervalTicks = randomSeconds * 20;
+                LOGGER.debug("Random interval selected: {} seconds", randomSeconds);
             } else {
-                currentTargetInterval = level.getGameRules().getInt(ModGameRules.CHECKPOINT_FIXED_INTERVAL) * 20;
+                intervalTicks = level.getGameRules().getInt(ModGameRules.CHECKPOINT_FIXED_INTERVAL) * 20;
             }
+            
+            nextCheckpointTargetTick = currentTick + intervalTicks;
+            LOGGER.debug("Next checkpoint scheduled for tick: {}", nextCheckpointTargetTick);
         }
 
-        if (ticksSinceLastCheckpoint >= currentTargetInterval) {
+        if (currentTick >= nextCheckpointTargetTick) {
             CheckpointData data = CheckpointData.get(level);
 
             if (data.getAnchorPlayerUUID() == null) {
@@ -76,7 +80,7 @@ public class CheckpointTicker {
                     ServerPlayer firstPlayer = server.getPlayerList().getPlayers().get(0);
                     data.setAnchorPlayerUUID(firstPlayer.getUUID());
                 } else {
-                    return;
+                    return; 
                 }
             }
 
@@ -86,15 +90,13 @@ public class CheckpointTicker {
                     CheckpointManager.setCheckpoint(anchorPlayer);
                     LOGGER.info("Auto-checkpoint created for anchor: {}", anchorPlayer.getName().getString());
 
-                    ticksSinceLastCheckpoint = 0;
-                    currentTargetInterval = -1;
+                    nextCheckpointTargetTick = -1;
                 } else {
-                    if (ticksSinceLastCheckpoint % 40 == 0) {
-                        LOGGER.debug("Auto-checkpoint postponed: Anchor player is in an unsafe state.");
-                    }
+                    LOGGER.debug("Unsafe to checkpoint. Retrying in 1 second...");
+                    nextCheckpointTargetTick = currentTick + 20;
                 }
             } else {
-                LOGGER.warn("Anchor player UUID {} not found online. Skipping checkpoint but keeping timer ready.", data.getAnchorPlayerUUID());
+                 nextCheckpointTargetTick = currentTick + 100;
             }
         }
     }
@@ -118,14 +120,13 @@ public class CheckpointTicker {
 
                 BlockState state = player.level().getBlockState(pos);
                 if (!state.isAir()) {
+                    if (state.getFluidState().is(FluidTags.LAVA)) {
+                        return false; 
+                    }
+                    groundFound = true;
                     if (!state.getFluidState().isEmpty()) {
-                        if (state.getFluidState().is(FluidTags.LAVA)) {
-                            return false; 
-                        }
-                        groundFound = true;
                         expectedDamage = 0; 
                     } else {
-                        groundFound = true;
                         double distToGround = y - pos.getY();
                         float totalFallDistance = player.fallDistance + (float) distToGround;
                         expectedDamage = Math.max(0, totalFallDistance - 3.0f);

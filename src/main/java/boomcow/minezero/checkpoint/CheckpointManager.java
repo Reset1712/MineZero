@@ -344,6 +344,15 @@ public class CheckpointManager {
             player.setXRot(pdata.pitch);
             player.setYRot(pdata.yaw);
             player.setYHeadRot(pdata.yaw);
+            
+            player.xo = pdata.posX;
+            player.yo = pdata.posY;
+            player.zo = pdata.posZ;
+            player.xOld = pdata.posX;
+            player.yOld = pdata.posY;
+            player.zOld = pdata.posZ;
+            player.yRotO = pdata.yaw;
+            player.xRotO = pdata.pitch;
 
             ServerLevel targetLevel = rootLevel.getServer().getLevel(pdata.dimension);
             if (targetLevel != null) {
