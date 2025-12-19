@@ -40,7 +40,7 @@ public class CheckpointTicker {
 
         long currentTick = server.getTickCount();
 
-        if (lastCheckpointTick == -1) {
+        if (lastCheckpointTick == -1 || currentTick < lastCheckpointTick) {
             lastCheckpointTick = currentTick;
             return;
         }

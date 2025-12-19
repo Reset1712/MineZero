@@ -336,9 +336,17 @@ public class CheckpointManager {
             PlayerData pdata = data.getPlayerData(player.getUUID(), lookupProvider);
             if (pdata == null) continue;
 
+            player.stopRiding();
+            player.resetFallDistance();
+            player.setDeltaMovement(Vec3.ZERO);
+
             ServerLevel targetLevel = rootLevel.getServer().getLevel(pdata.dimension);
             if (targetLevel != null) {
-                player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                if (targetLevel == player.serverLevel()) {
+                    player.connection.teleport(pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                } else {
+                    player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+                }
             }
 
             player.setHealth(pdata.health);
@@ -361,7 +369,6 @@ public class CheckpointManager {
             }
 
             player.setDeltaMovement(new Vec3(pdata.motionX, pdata.motionY, pdata.motionZ));
-            player.fallDistance = pdata.fallDistance;
             
             player.removeAllEffects();
             for (MobEffectInstance effect : pdata.potionEffects) {
