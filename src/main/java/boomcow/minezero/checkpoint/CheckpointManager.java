@@ -339,10 +339,22 @@ public class CheckpointManager {
             player.stopRiding();
             player.resetFallDistance();
             player.setDeltaMovement(Vec3.ZERO);
+            
+            // Сбрасываем интерполяцию клиента, чтобы он не "догонял" позицию
+            player.xo = pdata.posX;
+            player.yo = pdata.posY;
+            player.zo = pdata.posZ;
+            player.yRotO = pdata.yaw;
+            player.xRotO = pdata.pitch;
+
+            // Принудительно ставим позицию на сервере
+            player.moveTo(pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
+            player.setYHeadRot(pdata.yaw);
 
             ServerLevel targetLevel = rootLevel.getServer().getLevel(pdata.dimension);
             if (targetLevel != null) {
                 if (targetLevel == player.serverLevel()) {
+                    // Используем connection.teleport для жесткой синхронизации
                     player.connection.teleport(pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);
                 } else {
                     player.teleportTo(targetLevel, pdata.posX, pdata.posY, pdata.posZ, pdata.yaw, pdata.pitch);

@@ -80,7 +80,7 @@ public class MineZero {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new DeathEventHandler());
 
-        NeoForge.EVENT_BUS.register(CheckpointTicker.class);
+        // REMOVED manual registration of CheckpointTicker (now handled by @EventBusSubscriber)
         // REMOVED ExplosionEventHandler
         NeoForge.EVENT_BUS.register(GlobalTickHandler.class);
         NeoForge.EVENT_BUS.register(LightningStrikeListener.class);

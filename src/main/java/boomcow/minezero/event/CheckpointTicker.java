@@ -1,5 +1,6 @@
 package boomcow.minezero.event;
 
+import boomcow.minezero.MineZero;
 import boomcow.minezero.ModGameRules;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
@@ -14,6 +15,8 @@ import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -21,12 +24,20 @@ import org.apache.logging.log4j.Logger;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+@EventBusSubscriber(modid = MineZero.MODID, bus = EventBusSubscriber.Bus.GAME)
 public class CheckpointTicker {
 
     private static final Logger LOGGER = LogManager.getLogger(CheckpointTicker.class);
 
     private static long lastCheckpointTick = -1;
     private static int currentRandomIntervalTicks = -1;
+
+    // Сбрасываем статику при старте сервера, чтобы не переносить состояние из прошлого мира
+    @SubscribeEvent
+    public static void onServerStarting(ServerStartingEvent event) {
+        lastCheckpointTick = -1;
+        currentRandomIntervalTicks = -1;
+    }
 
     @SubscribeEvent
     public static void onServerTickPost(ServerTickEvent.Post event) {
@@ -40,6 +51,7 @@ public class CheckpointTicker {
 
         long currentTick = server.getTickCount();
 
+        // Если это первый тик или произошел рестарт мира (время пошло назад)
         if (lastCheckpointTick == -1 || currentTick < lastCheckpointTick) {
             lastCheckpointTick = currentTick;
             return;
@@ -88,6 +100,7 @@ public class CheckpointTicker {
                     lastCheckpointTick = currentTick;
                     currentRandomIntervalTicks = -1;
                 } else {
+                    // Если небезопасно, пробуем в следующем тике (таймер не сбрасываем)
                     LOGGER.debug("Auto-checkpoint postponed: Anchor player is in an unsafe state.");
                 }
             } else {
@@ -104,13 +117,13 @@ public class CheckpointTicker {
         if (player.fallDistance > 0) {
             double y = player.getY();
             int minHeight = player.level().getMinBuildHeight();
-            double distToGround = 0;
             boolean groundFound = false;
             float expectedDamage = 0;
 
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(player.getX(), y, player.getZ());
 
-            for (int i = 0; i < 256; i++) {
+            // Увеличили дальность проверки до 512, чтобы доставать до земли с гор
+            for (int i = 0; i < 512; i++) {
                 pos.setY((int) (y - i));
                 if (pos.getY() < minHeight) break;
 
@@ -118,13 +131,13 @@ public class CheckpointTicker {
                 if (!state.isAir()) {
                     if (!state.getFluidState().isEmpty()) {
                         if (state.getFluidState().is(FluidTags.LAVA)) {
-                            return false; 
+                            return false; // Падение в лаву
                         }
                         groundFound = true;
-                        expectedDamage = 0; 
+                        expectedDamage = 0; // Вода гасит урон
                     } else {
                         groundFound = true;
-                        distToGround = i;
+                        double distToGround = y - pos.getY(); // Более точный расчет
                         float totalFallDistance = player.fallDistance + (float) distToGround;
                         expectedDamage = Math.max(0, totalFallDistance - 3.0f);
                     }
@@ -133,11 +146,12 @@ public class CheckpointTicker {
             }
 
             if (!groundFound) {
+                // Если земля не найдена даже за 512 блоков (например, void), считаем опасным
                 return false; 
             }
 
             if (player.getHealth() - expectedDamage <= 0) {
-                return false; 
+                return false; // Смертельное падение
             }
         }
 
