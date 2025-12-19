@@ -3,14 +3,22 @@ package boomcow.minezero.event;
 import boomcow.minezero.ModGameRules;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class CheckpointTicker {
@@ -73,14 +81,79 @@ public class CheckpointTicker {
 
             ServerPlayer anchorPlayer = server.getPlayerList().getPlayer(data.getAnchorPlayerUUID());
             if (anchorPlayer != null) {
-                CheckpointManager.setCheckpoint(anchorPlayer);
-                LOGGER.info("Auto-checkpoint created for anchor: {}", anchorPlayer.getName().getString());
+                if (isPlayerSafe(anchorPlayer)) {
+                    CheckpointManager.setCheckpoint(anchorPlayer);
+                    LOGGER.info("Auto-checkpoint created for anchor: {}", anchorPlayer.getName().getString());
 
-                lastCheckpointTick = currentTick;
-                currentRandomIntervalTicks = -1;
+                    lastCheckpointTick = currentTick;
+                    currentRandomIntervalTicks = -1;
+                } else {
+                    LOGGER.debug("Auto-checkpoint postponed: Anchor player is in an unsafe state.");
+                }
             } else {
                 LOGGER.warn("Anchor player UUID {} not found online. Skipping checkpoint but keeping timer ready.", data.getAnchorPlayerUUID());
             }
         }
+    }
+
+    private static boolean isPlayerSafe(ServerPlayer player) {
+        if (player.isInLava()) {
+            return false;
+        }
+
+        if (player.fallDistance > 0) {
+            double y = player.getY();
+            int minHeight = player.level().getMinBuildHeight();
+            double distToGround = 0;
+            boolean groundFound = false;
+            float expectedDamage = 0;
+
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(player.getX(), y, player.getZ());
+
+            for (int i = 0; i < 256; i++) {
+                pos.setY((int) (y - i));
+                if (pos.getY() < minHeight) break;
+
+                BlockState state = player.level().getBlockState(pos);
+                if (!state.isAir()) {
+                    if (!state.getFluidState().isEmpty()) {
+                        if (state.getFluidState().is(FluidTags.LAVA)) {
+                            return false; 
+                        }
+                        groundFound = true;
+                        expectedDamage = 0; 
+                    } else {
+                        groundFound = true;
+                        distToGround = i;
+                        float totalFallDistance = player.fallDistance + (float) distToGround;
+                        expectedDamage = Math.max(0, totalFallDistance - 3.0f);
+                    }
+                    break;
+                }
+            }
+
+            if (!groundFound) {
+                return false; 
+            }
+
+            if (player.getHealth() - expectedDamage <= 0) {
+                return false; 
+            }
+        }
+
+        AABB searchArea = player.getBoundingBox().inflate(10.0);
+        List<Entity> dangerousEntities = player.level().getEntities(player, searchArea, e -> {
+            if (e instanceof PrimedTnt) return true;
+            if (e instanceof Creeper creeper) {
+                return creeper.getSwellDir() > 0 || creeper.isIgnited();
+            }
+            return false;
+        });
+
+        if (!dangerousEntities.isEmpty()) {
+            return false;
+        }
+
+        return true;
     }
 }
