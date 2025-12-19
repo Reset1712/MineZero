@@ -344,7 +344,7 @@ public class CheckpointManager {
             player.setXRot(pdata.pitch);
             player.setYRot(pdata.yaw);
             player.setYHeadRot(pdata.yaw);
-            
+
             player.xo = pdata.posX;
             player.yo = pdata.posY;
             player.zo = pdata.posZ;
