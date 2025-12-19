@@ -29,14 +29,13 @@ public class CheckpointTicker {
 
     private static final Logger LOGGER = LogManager.getLogger(CheckpointTicker.class);
 
-    private static long lastCheckpointTick = -1;
-    private static int currentRandomIntervalTicks = -1;
+    private static int ticksSinceLastCheckpoint = 0;
+    private static int currentTargetInterval = -1;
 
-    // Сбрасываем статику при старте сервера, чтобы не переносить состояние из прошлого мира
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        lastCheckpointTick = -1;
-        currentRandomIntervalTicks = -1;
+        ticksSinceLastCheckpoint = 0;
+        currentTargetInterval = -1;
     }
 
     @SubscribeEvent
@@ -49,19 +48,11 @@ public class CheckpointTicker {
             return;
         }
 
-        long currentTick = server.getTickCount();
+        ticksSinceLastCheckpoint++;
 
-        // Если это первый тик или произошел рестарт мира (время пошло назад)
-        if (lastCheckpointTick == -1 || currentTick < lastCheckpointTick) {
-            lastCheckpointTick = currentTick;
-            return;
-        }
-
-        int requiredIntervalTicks;
-        boolean useRandom = level.getGameRules().getBoolean(ModGameRules.USE_RANDOM_INTERVAL);
-
-        if (useRandom) {
-            if (currentRandomIntervalTicks == -1) {
+        if (currentTargetInterval == -1) {
+            boolean useRandom = level.getGameRules().getBoolean(ModGameRules.USE_RANDOM_INTERVAL);
+            if (useRandom) {
                 int lowerSeconds = level.getGameRules().getInt(ModGameRules.RANDOM_CHECKPOINT_LOWER_BOUND);
                 int upperSeconds = level.getGameRules().getInt(ModGameRules.RANDOM_CHECKPOINT_UPPER_BOUND);
 
@@ -70,16 +61,14 @@ public class CheckpointTicker {
                 }
 
                 int randomSeconds = lowerSeconds + ThreadLocalRandom.current().nextInt(upperSeconds - lowerSeconds);
-                currentRandomIntervalTicks = randomSeconds * 20;
+                currentTargetInterval = randomSeconds * 20;
                 LOGGER.debug("Next random checkpoint interval: {} seconds", randomSeconds);
+            } else {
+                currentTargetInterval = level.getGameRules().getInt(ModGameRules.CHECKPOINT_FIXED_INTERVAL) * 20;
             }
-            requiredIntervalTicks = currentRandomIntervalTicks;
-        } else {
-            currentRandomIntervalTicks = -1;
-            requiredIntervalTicks = level.getGameRules().getInt(ModGameRules.CHECKPOINT_FIXED_INTERVAL) * 20;
         }
 
-        if (currentTick - lastCheckpointTick >= requiredIntervalTicks) {
+        if (ticksSinceLastCheckpoint >= currentTargetInterval) {
             CheckpointData data = CheckpointData.get(level);
 
             if (data.getAnchorPlayerUUID() == null) {
@@ -97,11 +86,12 @@ public class CheckpointTicker {
                     CheckpointManager.setCheckpoint(anchorPlayer);
                     LOGGER.info("Auto-checkpoint created for anchor: {}", anchorPlayer.getName().getString());
 
-                    lastCheckpointTick = currentTick;
-                    currentRandomIntervalTicks = -1;
+                    ticksSinceLastCheckpoint = 0;
+                    currentTargetInterval = -1;
                 } else {
-                    // Если небезопасно, пробуем в следующем тике (таймер не сбрасываем)
-                    LOGGER.debug("Auto-checkpoint postponed: Anchor player is in an unsafe state.");
+                    if (ticksSinceLastCheckpoint % 40 == 0) {
+                        LOGGER.debug("Auto-checkpoint postponed: Anchor player is in an unsafe state.");
+                    }
                 }
             } else {
                 LOGGER.warn("Anchor player UUID {} not found online. Skipping checkpoint but keeping timer ready.", data.getAnchorPlayerUUID());
@@ -122,8 +112,7 @@ public class CheckpointTicker {
 
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(player.getX(), y, player.getZ());
 
-            // Увеличили дальность проверки до 512, чтобы доставать до земли с гор
-            for (int i = 0; i < 512; i++) {
+            for (int i = 0; i < 320; i++) {
                 pos.setY((int) (y - i));
                 if (pos.getY() < minHeight) break;
 
@@ -131,13 +120,13 @@ public class CheckpointTicker {
                 if (!state.isAir()) {
                     if (!state.getFluidState().isEmpty()) {
                         if (state.getFluidState().is(FluidTags.LAVA)) {
-                            return false; // Падение в лаву
+                            return false; 
                         }
                         groundFound = true;
-                        expectedDamage = 0; // Вода гасит урон
+                        expectedDamage = 0; 
                     } else {
                         groundFound = true;
-                        double distToGround = y - pos.getY(); // Более точный расчет
+                        double distToGround = y - pos.getY();
                         float totalFallDistance = player.fallDistance + (float) distToGround;
                         expectedDamage = Math.max(0, totalFallDistance - 3.0f);
                     }
@@ -146,12 +135,11 @@ public class CheckpointTicker {
             }
 
             if (!groundFound) {
-                // Если земля не найдена даже за 512 блоков (например, void), считаем опасным
                 return false; 
             }
 
             if (player.getHealth() - expectedDamage <= 0) {
-                return false; // Смертельное падение
+                return false; 
             }
         }
 
