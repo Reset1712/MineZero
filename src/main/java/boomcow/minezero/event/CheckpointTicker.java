@@ -16,86 +16,71 @@ import java.util.concurrent.ThreadLocalRandom;
 public class CheckpointTicker {
 
     private static final Logger LOGGER = LogManager.getLogger(CheckpointTicker.class);
-    public static long lastCheckpointTick = 0;
-    private static long nextCheckpointInterval = 0;
 
-    private static boolean randomIntervalSelected = false;
-
-    private static int intervalTicks = 0;
+    private static long lastCheckpointTick = -1;
+    private static int currentRandomIntervalTicks = -1;
 
     @SubscribeEvent
     public static void onServerTickPost(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
         ServerLevel level = server.overworld();
         if (level == null) return;
-        var autoRule = level.getGameRules().getRule(ModGameRules.AUTO_CHECKPOINT_ENABLED);
-        if (autoRule == null) {
-            LOGGER.warn("Auto checkpoint game rule not found in world. Skipping checkpoint ticker.");
-            return;
-        }
-        boolean autoEnabled = autoRule.get();
-        if (!autoEnabled) {
-            return;
-        }
-        var useRandomRule = level.getGameRules().getRule(ModGameRules.USE_RANDOM_INTERVAL);
-        boolean useRandom = useRandomRule != null && useRandomRule.get();
 
-        if (useRandom && !randomIntervalSelected) {
-            var lowerRule = level.getGameRules().getRule(ModGameRules.RANDOM_CHECKPOINT_LOWER_BOUND);
-            var upperRule = level.getGameRules().getRule(ModGameRules.RANDOM_CHECKPOINT_UPPER_BOUND);
-            int lowerSeconds = lowerRule != null ? lowerRule.get() : 600;
-            int upperSeconds = upperRule != null ? upperRule.get() : 1200;
-            int lowerTicks = lowerSeconds * 20;
-            int upperTicks = upperSeconds * 20;
-            if (upperTicks <= lowerTicks) {
-                LOGGER.warn("Random checkpoint interval upper bound must be greater than lower bound. Using lower bound as fixed interval.");
-                intervalTicks = lowerTicks;
-            } else {
-                intervalTicks = lowerTicks + ThreadLocalRandom.current().nextInt(upperTicks - lowerTicks);
-                randomIntervalSelected = true;
-            }
-            LOGGER.debug("Using random interval: {} ticks (lower bound: {} ticks, upper bound: {} ticks)", intervalTicks, lowerTicks, upperTicks);
-        } else if (!useRandom) {
-            var fixedRule = level.getGameRules().getRule(ModGameRules.CHECKPOINT_FIXED_INTERVAL);
-            int fixedSeconds = fixedRule != null ? fixedRule.get() : 600;
-            intervalTicks = fixedSeconds * 20;
+        if (!level.getGameRules().getBoolean(ModGameRules.AUTO_CHECKPOINT_ENABLED)) {
+            return;
         }
 
         long currentTick = server.getTickCount();
-        if (intervalTicks != nextCheckpointInterval) {
 
-            nextCheckpointInterval = intervalTicks;
+        if (lastCheckpointTick == -1) {
             lastCheckpointTick = currentTick;
             return;
         }
-        if (nextCheckpointInterval == 0) {
-            nextCheckpointInterval = intervalTicks;
-            lastCheckpointTick = currentTick;
-            return;
+
+        int requiredIntervalTicks;
+        boolean useRandom = level.getGameRules().getBoolean(ModGameRules.USE_RANDOM_INTERVAL);
+
+        if (useRandom) {
+            if (currentRandomIntervalTicks == -1) {
+                int lowerSeconds = level.getGameRules().getInt(ModGameRules.RANDOM_CHECKPOINT_LOWER_BOUND);
+                int upperSeconds = level.getGameRules().getInt(ModGameRules.RANDOM_CHECKPOINT_UPPER_BOUND);
+
+                if (upperSeconds <= lowerSeconds) {
+                    upperSeconds = lowerSeconds + 1;
+                }
+
+                int randomSeconds = lowerSeconds + ThreadLocalRandom.current().nextInt(upperSeconds - lowerSeconds);
+                currentRandomIntervalTicks = randomSeconds * 20;
+                LOGGER.debug("Next random checkpoint interval: {} seconds", randomSeconds);
+            }
+            requiredIntervalTicks = currentRandomIntervalTicks;
+        } else {
+            currentRandomIntervalTicks = -1;
+            requiredIntervalTicks = level.getGameRules().getInt(ModGameRules.CHECKPOINT_FIXED_INTERVAL) * 20;
         }
-        if (currentTick - lastCheckpointTick >= nextCheckpointInterval) {
+
+        if (currentTick - lastCheckpointTick >= requiredIntervalTicks) {
             CheckpointData data = CheckpointData.get(level);
+
             if (data.getAnchorPlayerUUID() == null) {
                 if (!server.getPlayerList().getPlayers().isEmpty()) {
                     ServerPlayer firstPlayer = server.getPlayerList().getPlayers().get(0);
                     data.setAnchorPlayerUUID(firstPlayer.getUUID());
-
                 } else {
-                    LOGGER.warn("No players online to set as anchor.");
                     return;
                 }
             }
+
             ServerPlayer anchorPlayer = server.getPlayerList().getPlayer(data.getAnchorPlayerUUID());
             if (anchorPlayer != null) {
-
                 CheckpointManager.setCheckpoint(anchorPlayer);
-                randomIntervalSelected = false;
+                LOGGER.info("Auto-checkpoint created for anchor: {}", anchorPlayer.getName().getString());
+
+                lastCheckpointTick = currentTick;
+                currentRandomIntervalTicks = -1;
             } else {
-                LOGGER.warn("Anchor player not found for UUID: {}", data.getAnchorPlayerUUID());
+                LOGGER.warn("Anchor player UUID {} not found online. Skipping checkpoint but keeping timer ready.", data.getAnchorPlayerUUID());
             }
-            lastCheckpointTick = currentTick;
-            nextCheckpointInterval = intervalTicks;
-            LOGGER.debug("Reset checkpoint timer: next interval {} ticks, new last tick {}", nextCheckpointInterval, lastCheckpointTick);
         }
     }
 }
