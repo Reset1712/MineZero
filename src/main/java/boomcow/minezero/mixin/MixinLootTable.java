@@ -1,5 +1,6 @@
 package boomcow.minezero.mixin;
 
+import boomcow.minezero.util.IMineZeroLootSeed;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.LootContext;

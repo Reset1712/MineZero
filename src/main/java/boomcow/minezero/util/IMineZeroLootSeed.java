@@ -1,4 +1,4 @@
-package boomcow.minezero.mixin;
+package boomcow.minezero.util;
 
 public interface IMineZeroLootSeed {
     long minezero$getLootSeed();
