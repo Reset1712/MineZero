@@ -5,9 +5,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParamSet;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,8 +21,6 @@ public abstract class MixinLootTable {
     @Shadow
     public abstract void getRandomItems(LootContext context, Consumer<ItemStack> stackConsumer);
 
-    @Shadow @Final private LootContextParamSet paramSet;
-
     @Inject(method = "getRandomItems(Lnet/minecraft/world/level/storage/loot/LootParams;Ljava/util/function/Consumer;)V", at = @At("HEAD"), cancellable = true)
     private void onGetRandomItems(LootParams params, Consumer<ItemStack> consumer, CallbackInfo ci) {
         Entity entity = params.getOptionalParameter(LootContextParams.THIS_ENTITY);
@@ -33,7 +29,7 @@ public abstract class MixinLootTable {
             if (seed != 0) {
                 LootContext.Builder builder = new LootContext.Builder(params);
                 builder.withOptionalRandomSeed(seed);
-                LootContext context = builder.create(this.paramSet);
+                LootContext context = builder.create(Optional.empty());
                 this.getRandomItems(context, consumer);
                 ci.cancel();
             }
