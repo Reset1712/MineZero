@@ -8,7 +8,7 @@
     "MixinLevelChunk",
     "MixinExplosion",
     "MixinServerCommonPacketListenerImpl",
-    "MixinLootTable"
+    "MixinLootContextBuilder"
   ],
   "injectors": {
     "defaultRequire": 1
