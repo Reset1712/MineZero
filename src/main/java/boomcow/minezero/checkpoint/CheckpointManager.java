@@ -415,19 +415,8 @@ public class CheckpointManager {
         List<Entity> entitiesToRemove = new ArrayList<>();
         for (ServerLevel serverLevel : rootLevel.getServer().getAllLevels()) {
             for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof ServerPlayer || entity.isRemoved()) continue;
-
-                if (data.isEntitySaved(entity.getUUID())) {
+                if (!(entity instanceof ServerPlayer) && !entity.isRemoved()) {
                     entitiesToRemove.add(entity);
-                } else {
-                    if (entity instanceof Enemy || 
-                        entity instanceof Projectile || 
-                        entity instanceof ItemEntity || 
-                        entity instanceof ExperienceOrb || 
-                        entity instanceof PrimedTnt || 
-                        entity instanceof FallingBlockEntity) {
-                        entitiesToRemove.add(entity);
-                    }
                 }
             }
             for (Entity e : entitiesToRemove) e.discard();
