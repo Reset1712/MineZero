@@ -3,7 +3,9 @@ package boomcow.minezero.mixin;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -14,7 +16,7 @@ import java.util.UUID;
 @Mixin(Entity.class)
 public abstract class MixinEntity {
 
-    @Shadow
+    @Shadow @Final @Mutable
     public RandomSource random;
 
     @Shadow
