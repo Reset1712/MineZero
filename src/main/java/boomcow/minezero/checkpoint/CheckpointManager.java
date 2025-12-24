@@ -1,6 +1,5 @@
 package boomcow.minezero.checkpoint;
 
-import boomcow.minezero.util.ILevelRandomAccessor;
 import boomcow.minezero.util.LightningScheduler;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.AdvancementProgress;
@@ -93,15 +92,6 @@ public class CheckpointManager {
             }
 
             restoreTimeAndWeather(level, data.getWorldData());
-            
-            long restoredTime = data.getWorldData().getGameTime();
-            for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
-                if (serverLevel instanceof ILevelRandomAccessor accessor) {
-                    long seed = restoredTime ^ serverLevel.dimension().location().hashCode();
-                    accessor.minezero$setRandomSeed(seed);
-                }
-            }
-
             restoreBlocksAndFluids(level, data.getWorldData(), lookupProvider);
             restorePlayers(level, data, lookupProvider);
             restoreEntities(level, data);

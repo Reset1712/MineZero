@@ -9,8 +9,7 @@
     "MixinExplosion",
     "MixinServerCommonPacketListenerImpl",
     "MixinLootContextBuilder",
-    "MixinEntity",
-    "MixinLevel"
+    "MixinEntity"
   ],
   "injectors": {
     "defaultRequire": 1
