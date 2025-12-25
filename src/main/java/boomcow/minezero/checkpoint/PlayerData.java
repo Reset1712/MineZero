@@ -12,6 +12,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class PlayerData {
     public double posX;
@@ -35,6 +36,7 @@ public class PlayerData {
     public double spawnZ;
     public ResourceKey<Level> spawnDimension;
     public boolean spawnForced;
+    public UUID vehicleUUID;
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
     public CompoundTag advancements = new CompoundTag();
 
@@ -65,6 +67,9 @@ public class PlayerData {
         if (spawnDimension != null) {
             tag.putString("SpawnDimension", spawnDimension.location().toString());
         }
+        if (vehicleUUID != null) {
+            tag.putUUID("VehicleUUID", vehicleUUID);
+        }
         ListTag effectsTag = new ListTag();
         for (MobEffectInstance effect : potionEffects) {
             Tag effectNbtTag = effect.save();
@@ -79,8 +84,6 @@ public class PlayerData {
         }
 
         tag.put("Inventory", this.inventoryNBT);
-
-
 
         return tag;
     }
@@ -106,7 +109,6 @@ public class PlayerData {
         data.experienceLevel = tag.getInt("ExperienceLevel");
         data.experienceProgress = tag.getFloat("ExperienceProgress");
 
-
         if (tag.contains("SpawnDimension", Tag.TAG_STRING)) {
             String spawnDimString = tag.getString("SpawnDimension");
             try {
@@ -115,6 +117,9 @@ public class PlayerData {
                 System.err.println("Failed to parse SpawnDimension ResourceLocation string: " + spawnDimString + " - " + e.getMessage());
                 data.spawnDimension = null;
             }
+        }
+        if (tag.hasUUID("VehicleUUID")) {
+            data.vehicleUUID = tag.getUUID("VehicleUUID");
         }
         data.potionEffects.clear();
         ListTag effectsTag = tag.getList("PotionEffects", 10);
@@ -144,7 +149,6 @@ public class PlayerData {
         if (tag.contains("Inventory", Tag.TAG_LIST)) {
             data.inventoryNBT = tag.getList("Inventory", Tag.TAG_COMPOUND);
         }
-
 
         return data;
     }

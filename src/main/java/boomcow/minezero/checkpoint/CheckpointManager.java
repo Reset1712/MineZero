@@ -1,5 +1,6 @@
 package boomcow.minezero.checkpoint;
 
+import boomcow.minezero.util.ILevelRandomAccessor;
 import boomcow.minezero.util.LightningScheduler;
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.AdvancementProgress;
@@ -92,9 +93,19 @@ public class CheckpointManager {
             }
 
             restoreTimeAndWeather(level, data.getWorldData());
+            
+            long restoredTime = data.getWorldData().getGameTime();
+            for (ServerLevel serverLevel : level.getServer().getAllLevels()) {
+                if (serverLevel instanceof ILevelRandomAccessor accessor) {
+                    long seed = restoredTime ^ serverLevel.dimension().location().hashCode();
+                    accessor.minezero$setRandomSeed(seed);
+                }
+            }
+
             restoreBlocksAndFluids(level, data.getWorldData(), lookupProvider);
             restorePlayers(level, data, lookupProvider);
             restoreEntities(level, data);
+            restoreMounts(level, data, lookupProvider);
             restoreWorldExtras(level, data.getWorldData());
 
             long endTime = System.nanoTime();
@@ -134,6 +145,10 @@ public class CheckpointManager {
             pdata.spawnZ = spawn.getZ() + 0.5;
             pdata.spawnDimension = spawnDim;
             pdata.spawnForced = player.isRespawnForced();
+        }
+
+        if (player.getVehicle() != null) {
+            pdata.vehicleUUID = player.getVehicle().getUUID();
         }
 
         pdata.potionEffects.clear();
@@ -489,6 +504,19 @@ public class CheckpointManager {
                     }
                     return e;
                 });
+            }
+        }
+    }
+
+    private static void restoreMounts(ServerLevel rootLevel, CheckpointData data, HolderLookup.Provider lookupProvider) {
+        for (ServerPlayer player : rootLevel.getServer().getPlayerList().getPlayers()) {
+            PlayerData pdata = data.getPlayerData(player.getUUID(), lookupProvider);
+            if (pdata != null && pdata.vehicleUUID != null) {
+                ServerLevel playerLevel = player.serverLevel();
+                Entity vehicle = playerLevel.getEntity(pdata.vehicleUUID);
+                if (vehicle != null) {
+                    player.startRiding(vehicle, true);
+                }
             }
         }
     }
