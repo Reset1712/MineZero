@@ -36,9 +36,9 @@ public class PlayerData {
     public double spawnZ;
     public ResourceKey<Level> spawnDimension;
     public boolean spawnForced;
-    public UUID vehicleUUID;
     public List<MobEffectInstance> potionEffects = new ArrayList<>();
     public CompoundTag advancements = new CompoundTag();
+    public UUID vehicleUUID;
 
     public ListTag inventoryNBT = new ListTag();
 
@@ -109,6 +109,10 @@ public class PlayerData {
         data.experienceLevel = tag.getInt("ExperienceLevel");
         data.experienceProgress = tag.getFloat("ExperienceProgress");
 
+        if (tag.hasUUID("VehicleUUID")) {
+            data.vehicleUUID = tag.getUUID("VehicleUUID");
+        }
+
         if (tag.contains("SpawnDimension", Tag.TAG_STRING)) {
             String spawnDimString = tag.getString("SpawnDimension");
             try {
@@ -117,9 +121,6 @@ public class PlayerData {
                 System.err.println("Failed to parse SpawnDimension ResourceLocation string: " + spawnDimString + " - " + e.getMessage());
                 data.spawnDimension = null;
             }
-        }
-        if (tag.hasUUID("VehicleUUID")) {
-            data.vehicleUUID = tag.getUUID("VehicleUUID");
         }
         data.potionEffects.clear();
         ListTag effectsTag = tag.getList("PotionEffects", 10);
