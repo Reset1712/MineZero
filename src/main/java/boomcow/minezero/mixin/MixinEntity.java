@@ -3,6 +3,8 @@ package boomcow.minezero.mixin;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -21,6 +23,15 @@ public abstract class MixinEntity {
 
     @Shadow
     public abstract UUID getUUID();
+
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void onInit(EntityType<?> type, Level level, CallbackInfo ci) {
+        UUID uuid = this.getUUID();
+        if (uuid != null) {
+            long seed = uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits();
+            this.random = RandomSource.create(seed);
+        }
+    }
 
     @Inject(method = "load", at = @At("TAIL"))
     private void onLoad(CompoundTag tag, CallbackInfo ci) {
