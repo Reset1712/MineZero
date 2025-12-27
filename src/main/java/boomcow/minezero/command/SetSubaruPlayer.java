@@ -1,31 +1,28 @@
 package boomcow.minezero.command;
 
-import boomcow.minezero.checkpoint.CheckpointManager;
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
-import net.minecraft.commands.arguments.EntityArgument;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import boomcow.minezero.checkpoint.CheckpointManager;
 import boomcow.minezero.checkpoint.CheckpointData;
-import net.minecraft.server.level.ServerLevel;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
 
 public class SetSubaruPlayer {
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, net.minecraft.command.CommandRegistryAccess registryAccess) {
         dispatcher.register(
-                Commands.literal("setSubaruPlayer")
-                        .requires(cs -> cs.hasPermission(2))
-                        .then(Commands.argument("target", EntityArgument.player())
+                CommandManager.literal("setSubaruPlayer")
+                        .requires(source -> source.hasPermissionLevel(2))
+                        .then(CommandManager.argument("target", EntityArgumentType.player())
                                 .executes(context -> {
-                                    ServerPlayer target = EntityArgument.getPlayer(context, "target");
-                                    ServerLevel level = target.serverLevel();
-                                    CheckpointData data = CheckpointData.get(level);
-                                    data.setAnchorPlayerUUID(target.getUUID());
-                                    context.getSource().sendSuccess(() -> Component.literal("Anchor player set to " + target.getName().getString()), true);
+                                    ServerPlayerEntity target = EntityArgumentType.getPlayer(context, "target");
+                                    ServerWorld world = target.getServerWorld();
+                                    CheckpointData data = CheckpointData.get(world);
+                                    data.setAnchorPlayerUUID(target.getUuid());
+                                    context.getSource().sendFeedback(() -> Text.literal("Anchor player set to " + target.getName().getString()), true);
                                     return 1;
                                 }))
         );
-
     }
 }

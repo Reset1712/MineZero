@@ -1,40 +1,33 @@
 package boomcow.minezero.command;
 
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.commands.arguments.EntityArgument;
 import boomcow.minezero.checkpoint.CheckpointManager;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
-import net.minecraft.commands.arguments.EntityArgument;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 
 public class SetCheckPointCommand {
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, net.minecraft.command.CommandRegistryAccess registryAccess) {
         dispatcher.register(
-                Commands.literal("setcheckpoint")
-                        .requires(cs -> cs.hasPermission(2))
+                CommandManager.literal("setcheckpoint")
+                        .requires(source -> source.hasPermissionLevel(2))
                         .executes(context -> {
-                            CommandSourceStack source = context.getSource();
-                            ServerPlayer player;
-                            try {
-                                player = source.getPlayerOrException();
-                            } catch (Exception e) {
-                                source.sendFailure(Component.literal("This command can only be run by a player."));
-                                return 0;
-                            }
+                            ServerCommandSource source = context.getSource();
+                            ServerPlayerEntity player = source.getPlayerOrThrow();
 
                             CheckpointManager.setCheckpoint(player);
-                            source.sendSuccess(() -> Component.literal("Checkpoint set for yourself!"), true);
+                            source.sendFeedback(() -> Text.literal("Checkpoint set for yourself!"), true);
                             return 1;
                         })
-                        .then(Commands.argument("target", EntityArgument.player())
+                        .then(CommandManager.argument("target", EntityArgumentType.player())
                                 .executes(context -> {
-                                    CommandSourceStack source = context.getSource();
-                                    ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "target");
+                                    ServerCommandSource source = context.getSource();
+                                    ServerPlayerEntity targetPlayer = EntityArgumentType.getPlayer(context, "target");
 
                                     CheckpointManager.setCheckpoint(targetPlayer);
-                                    source.sendSuccess(() -> Component.literal("Checkpoint set for " + targetPlayer.getName().getString() + "!"), true);
+                                    source.sendFeedback(() -> Text.literal("Checkpoint set for " + targetPlayer.getName().getString() + "!"), true);
                                     return 1;
                                 }))
         );

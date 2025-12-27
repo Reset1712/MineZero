@@ -1,25 +1,26 @@
 package boomcow.minezero.event;
 
 import boomcow.minezero.checkpoint.CheckpointData;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.LightningBolt;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.minecraft.entity.LightningEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 
 public class LightningStrikeListener {
 
-    @SubscribeEvent
-    public static void onLightningStrike(EntityJoinLevelEvent event) {
-        if (!(event.getEntity() instanceof LightningBolt) || event.getLevel().isClientSide()) return;
-
-        ServerLevel level = (ServerLevel) event.getLevel();
-        CheckpointData data = CheckpointData.get(level);
-        if (data != null && data.getWorldData() != null) {
-            BlockPos strikePos = event.getEntity().blockPosition();
-            long tickTime = level.getGameTime();
-            data.getWorldData().addLightningStrike(strikePos, tickTime);
-        }
+    public static void register() {
+        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
+            if (world.isClient) return;
+            
+            if (entity instanceof LightningEntity) {
+                ServerWorld serverWorld = (ServerWorld) world;
+                CheckpointData data = CheckpointData.get(serverWorld);
+                if (data != null) {
+                    BlockPos strikePos = entity.getBlockPos();
+                    long tickTime = world.getTime();
+                    data.getWorldData().addLightningStrike(strikePos, tickTime);
+                }
+            }
+        });
     }
 }
-

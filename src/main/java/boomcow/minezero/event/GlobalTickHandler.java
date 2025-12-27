@@ -1,20 +1,16 @@
 package boomcow.minezero.event;
 
 import boomcow.minezero.util.LightningScheduler;
-import net.minecraft.server.level.ServerLevel;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
-
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.server.world.ServerWorld;
 
 public class GlobalTickHandler {
 
-    @SubscribeEvent
-    public static void onServerTick(ServerTickEvent.Post event) {
-
-        for (ServerLevel level : ServerLifecycleHooks.getCurrentServer().getAllLevels()) {
-            LightningScheduler.tick(level);
-        }
-
+    public static void register() {
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            for (ServerWorld world : server.getWorlds()) {
+                LightningScheduler.tick(world);
+            }
+        });
     }
 }

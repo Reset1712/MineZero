@@ -17,11 +17,10 @@ public class MixinLootContextParameterSetBuilder {
     @Inject(method = "build", at = @At("HEAD"))
     private void onBuild(LootContextParameterSet.DynamicDrop dynamicDrop, CallbackInfoReturnable<LootContextParameterSet> cir) {
         LootContextParameterSet.Builder builder = (LootContextParameterSet.Builder) (Object) this;
-        ServerWorld world = builder.getWorld(); 
+        ServerWorld world = builder.getWorld();
         Entity entity = builder.getOptional(LootContextParameters.THIS_ENTITY);
         
         if (entity instanceof LivingEntity && !(entity instanceof PlayerEntity)) {
-            long seed = entity.getUuid().getMostSignificantBits() ^ entity.getUuid().getLeastSignificantBits();
             if (world != null) {
                  
             }
