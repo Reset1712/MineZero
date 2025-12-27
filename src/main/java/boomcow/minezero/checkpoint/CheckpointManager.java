@@ -1,9 +1,9 @@
 package boomcow.minezero.checkpoint;
 
 import boomcow.minezero.util.LightningScheduler;
-import net.minecraft.advancements.Advancement;
-import net.minecraft.advancements.AdvancementEntry;
-import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.advancement.Advancement;
+import net.minecraft.advancement.AdvancementEntry;
+import net.minecraft.advancement.AdvancementProgress;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.EndPortalFrameBlock;

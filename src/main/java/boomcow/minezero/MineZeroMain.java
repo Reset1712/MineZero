@@ -6,11 +6,10 @@ import boomcow.minezero.command.TriggerRBD;
 import boomcow.minezero.ConfigHandler;
 import boomcow.minezero.event.*;
 import boomcow.minezero.items.ArtifactFluteItem;
-import boomcow.minezero.util.LightningScheduler;
+import boomcow.minezero.network.PacketHandler;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -28,7 +27,6 @@ import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class MineZeroMain implements ModInitializer {
 
     public static final String MOD_ID = "minezero";
@@ -41,19 +39,24 @@ public class MineZeroMain implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Initializing MineZero for Fabric with Yarn Mappings!");
         ConfigHandler.register();
-        ModGameRules.initialize();
+        
+        // Регистрация Пакетов (Сеть)
+        PacketHandler.register();
 
         registerBlocksAndItems();
         ModSoundEvents.registerSoundEvents();
-        registerServerTickEvents();
-        BlockChangeListener.register();
+        
+        // Регистрация Команд
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             SetCheckPointCommand.register(dispatcher, registryAccess);
             SetSubaruPlayer.register(dispatcher, registryAccess);
             TriggerRBD.register(dispatcher, registryAccess);
         });
 
+        // Регистрация Событий (Серверная часть)
         registerServerEventHandlers();
+        
+        // Регистрация Creative Tabs
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.BUILDING_BLOCKS).register(this::addBuildingBlocksToCreativeTab);
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.TOOLS_AND_UTILITIES).register(this::addToolsToCreativeTab);
 
@@ -86,23 +89,18 @@ public class MineZeroMain implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             LOGGER.info("MineZero: Server starting...");
         });
+        
+        // Регистрация всех серверных обработчиков событий
         CheckpointTicker.register();
+        GlobalTickHandler.register();
         LightningStrikeListener.register();
         DeathEventHandler.register();
+        EntityTracker.register(); // Не забываем новый трекер!
     }
+
     public void onPlayerLogin(ServerPlayerEntity player) {
         if (player.getWorld().isClient()) return;
-
         ServerWorld world = (ServerWorld) player.getWorld();
-
         LOGGER.info("Player {} logged in. MineZero login logic to be fully ported.", player.getName().getString());
-    }
-
-    private void registerServerTickEvents() {
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
-            for (ServerWorld world : server.getWorlds()) {
-                LightningScheduler.tick(world);
-            }
-        });
     }
 }
