@@ -7,8 +7,7 @@
     "MixinWorldChunk",
     "MixinExplosion",
     "MixinServerCommonNetworkHandler",
-    "MixinEntity",
-    "MixinLootContextParameterSetBuilder"
+    "MixinEntity"
   ],
   "injectors": {
     "defaultRequire": 1

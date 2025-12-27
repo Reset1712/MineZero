@@ -9,7 +9,6 @@ import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.text.Text;
-
 import java.util.Arrays;
 import java.util.List;
 
@@ -39,7 +38,6 @@ public class ModMenuIntegration implements ModMenuApi {
                             .setSaveConsumer(newValue -> ConfigHandler.get().deathChime = newValue)
                             .build()
             );
-
             return builder.build();
         };
     }

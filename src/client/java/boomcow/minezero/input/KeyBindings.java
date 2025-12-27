@@ -7,9 +7,7 @@ import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 
 public class KeyBindings {
-
     public static final String KEY_CATEGORY_MINEZERO = "key.categories.minezero";
-
     public static final KeyBinding EXAMPLE_ACTION_KEY;
     public static final KeyBinding SELF_DAMAGE_KEY;
 

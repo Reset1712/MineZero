@@ -14,7 +14,5 @@ public class MineZeroClient implements ClientModInitializer {
         LOGGER.info("Initializing MineZero client specifics (Yarn Mappings)!");
         KeyBindings.registerKeyBindings();
         ClientForgeEvents.registerClientEvents();
-
-        LOGGER.info("MineZero client setup complete.");
     }
 }
