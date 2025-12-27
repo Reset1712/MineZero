@@ -86,11 +86,8 @@ public class MineZeroMain implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             LOGGER.info("MineZero: Server starting...");
         });
-        BlockChangeListener.register();
         CheckpointTicker.register();
-        ExplosionEventHandler.register();
         LightningStrikeListener.register();
-        NonPlayerChangeHandler.register();
         DeathEventHandler.register();
     }
     public void onPlayerLogin(ServerPlayerEntity player) {
