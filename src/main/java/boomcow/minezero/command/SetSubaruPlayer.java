@@ -2,6 +2,7 @@ package boomcow.minezero.command;
 
 import boomcow.minezero.checkpoint.CheckpointData;
 import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -10,7 +11,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 
 public class SetSubaruPlayer {
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, net.minecraft.command.CommandRegistryAccess registryAccess) {
+    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(
                 CommandManager.literal("setSubaruPlayer")
                         .requires(source -> source.hasPermissionLevel(2))

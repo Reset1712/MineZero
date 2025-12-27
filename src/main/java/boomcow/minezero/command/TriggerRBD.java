@@ -3,6 +3,7 @@ package boomcow.minezero.command;
 import boomcow.minezero.checkpoint.CheckpointData;
 import boomcow.minezero.checkpoint.CheckpointManager;
 import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -16,7 +17,7 @@ import java.util.UUID;
 public class TriggerRBD {
     private static final Logger LOGGER = LoggerFactory.getLogger("MineZeroRBD");
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, net.minecraft.command.CommandRegistryAccess registryAccess) {
+    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(
                 CommandManager.literal("triggerRBD")
                         .requires(source -> source.hasPermissionLevel(2))
