@@ -22,7 +22,7 @@ public class MixinLootContextParameterSetBuilder {
         
         if (entity instanceof LivingEntity && !(entity instanceof PlayerEntity)) {
             if (world != null) {
-                 // Logic injection here if needed
+                 // Logic injection here
             }
         }
     }
